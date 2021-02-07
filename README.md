@@ -9,9 +9,9 @@ Design goals:
 * Compatiblity with clang and gcc.
 * Compatibility with Linux, Mac, iOS and Android.
 
-NON-goals:
-* Complete COM or ATL support. Out-of-process mashaling is for instance not implemented on non-Windows (would be nice to have though).
-* Wrapper-code-free access from C# and Python on non-Windows (would be nice to have though).
-* Out-of-process marshalling on non-Windows (would be nice to have though).
+Missing features:
+* Complete COM or ATL support. Out-of-process mashaling is for instance not implemented.
+* Wrapper-code-free access from C# and Python on non-Windows.
+* Out-of-process marshalling on non-Windows.
 
 Please contact the author if you're aware of any better alternative, and he'll be happy to scrap this project.
