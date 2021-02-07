@@ -7,7 +7,10 @@ Design goals:
 * Support simple COM classes implemented in ATL.
 * Support most automation-compatible types, so that the same COM classes can be directly accessed from C# and Python (using [comtypes](https://pythonhosted.org/comtypes/)) on Windows without any language wrappers or proxy-stub DLLs.
 * Compatiblity with clang and gcc.
+* Compatibility with Linux, Mac, iOS and Android.
 
 NON-goals:
 * Complete ATL support
 * Out-of-process marshalling on non-Windows (would be nice to have though)
+
+Please contact the author if you're aware of any better alternative, and he'll be happy to scrap this project.
