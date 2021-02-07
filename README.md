@@ -5,7 +5,7 @@ Designed as a compatibility library to enable building of existing COM/ATL class
 
 Design goals:
 * Support simple COM classes implemented in ATL.
-* Support automation-compatible types, so that the same COM classes can be directly accessed from C# and Python (using [comtypes](https://pythonhosted.org/comtypes/)) on Windows without any language wrappers or proxy-stub DLLs.
+* Support most automation-compatible types, so that the same COM classes can be directly accessed from C# and Python (using [comtypes](https://pythonhosted.org/comtypes/)) on Windows without any language wrappers or proxy-stub DLLs.
 * Compatiblity with clang and gcc.
 
 NON-goals:
