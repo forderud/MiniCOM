@@ -468,6 +468,79 @@ using CComQIPtr = CComPtr<T>;
 } // namespace ATL
 
 struct SAFEARRAY {
+    /** std::vector variant that also support non-owning pointers. */
+    template <class T>
+    class Buffer {
+        public:
+            Buffer(size_t size = 0) : m_size(size) {
+                if (size > 0) {
+                    m_ptr = new T[size];
+                    m_owning = true;
+                }
+            }
+            Buffer(const Buffer& other, bool deep_copy) : m_size(other.m_size) {
+                if (deep_copy) {
+                    m_ptr = new T[m_size];
+                    m_owning = true;
+                    memcpy(m_ptr, other.m_ptr, m_size);
+                } else {
+                    m_ptr = other.m_ptr;
+                    m_owning = false;
+                }
+            }
+
+            ~Buffer() {
+                if (m_ptr && m_owning)
+                    delete m_ptr;
+                m_ptr = nullptr;
+            }
+
+            size_t size() const {
+                return m_size;
+            }
+
+            T * data() {
+                return m_ptr;
+            }
+
+            T& operator [](size_t idx) {
+                return m_ptr[idx];
+            }
+            const T& operator [](size_t idx) const {
+                return m_ptr[idx];
+            }
+
+            void resize (size_t size, T val = T()) noexcept {
+                assert(m_owning);
+
+                // allocate new buffer
+                T * new_ptr = nullptr;
+                if (size > 0) {
+                    new_ptr = new T[size];
+                    m_owning = true;
+                    memcpy(new_ptr, m_ptr, std::min(m_size, size));
+                    for (size_t i = std::min(m_size, size); i < size; ++i)
+                        new_ptr[i] = val;
+                }
+                // delete old buffer
+                if (m_ptr && m_owning)
+                    delete m_ptr;
+                // commit changes
+                m_ptr = new_ptr;
+                m_size = size;
+            }
+
+            Buffer(const Buffer& other) = delete;
+            Buffer(Buffer&&) = delete;
+            Buffer& operator = (const Buffer&) = delete;
+            Buffer& operator = (Buffer&&) = delete;
+
+        private:
+            size_t m_size = 0;
+            T  *   m_ptr = nullptr;
+            bool   m_owning = true;
+    };
+
     enum TYPE {
         TYPE_EMPTY,
         TYPE_DATA,
@@ -480,7 +553,7 @@ struct SAFEARRAY {
     }
     SAFEARRAY (unsigned int _elm_size, unsigned int count) : type(TYPE_DATA), data(_elm_size*count), elm_size(_elm_size) {
     }
-    SAFEARRAY(const SAFEARRAY& other) : type(other.type), data(other.data), strings(other.strings), pointers(other.pointers), elm_size(other.elm_size) {
+    SAFEARRAY(const SAFEARRAY& other, bool deep_copy = true) : type(other.type), data(other.data, deep_copy), strings(other.strings), pointers(other.pointers), elm_size(other.elm_size) {
     }
 
     ~SAFEARRAY() {
@@ -490,7 +563,7 @@ struct SAFEARRAY {
     SAFEARRAY& operator = (const SAFEARRAY&) = delete;
 
     const TYPE                          type = TYPE_EMPTY; ///< \todo: Replace with std::variant when upgrading to C++17
-    std::vector<unsigned char>          data;
+    Buffer<unsigned char>               data;
     std::vector<ATL::CComBSTR>          strings;
     std::vector<ATL::CComPtr<IUnknown>> pointers;
     const unsigned int                  elm_size = 0;
@@ -567,8 +640,7 @@ struct CComSafeArray {
         assert(m_ptr->type == SAFEARRAY::TYPE_DATA);
         assert(sizeof(T) == m_ptr->elm_size);
         const size_t prev_size = m_ptr->data.size();
-        for (size_t i = 0; i < sizeof(T); ++i)
-            m_ptr->data.push_back(0);
+        m_ptr->data.resize(prev_size + sizeof(T), 0);
         reinterpret_cast<T&>(m_ptr->data[prev_size]) = t;
         return S_OK;
     }
