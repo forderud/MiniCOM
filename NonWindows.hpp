@@ -38,7 +38,7 @@ static_assert(sizeof(GUID) == 16, "GUID not packed");
 // __uuidof emulation
 template<typename Q>
 static GUID hold_uuidof () { return {}; }
-#define DEFINE_UUIDOF_ID(Q, IID) template<> GUID hold_uuidof<Q>() { return IID; }
+#define DEFINE_UUIDOF_ID(Q, IID) template<> inline GUID hold_uuidof<Q>() { return IID; }
 #define DEFINE_UUIDOF(Q) DEFINE_UUIDOF_ID(Q, IID_##Q)
 #define __uuidof(Q) hold_uuidof<Q>()
 
@@ -97,7 +97,7 @@ enum CLSCTX {
                                  CLSCTX_REMOTE_SERVER)
 
 
-static void CHECK (HRESULT hr) {
+inline void CHECK (HRESULT hr) {
     if (hr >= 0)
         return; // success
 
@@ -386,6 +386,9 @@ public:
     }
 
     HRESULT CoCreateInstance (std::wstring name, IUnknown* outer = NULL, DWORD context = CLSCTX_ALL) {
+        (void)outer;
+        (void)context;
+
         // convert name to ASCII
         std::string a_name(name.size(), '\0');
         wcstombs(const_cast<char*>(a_name.data()), name.c_str(), a_name.size());
@@ -404,6 +407,9 @@ public:
     }
 
     HRESULT CoCreateInstance (GUID clsid, IUnknown* outer = NULL, DWORD context = CLSCTX_ALL) {
+        (void)outer;
+        (void)context;
+
         CComPtr<IUnknown> tmp1(IUnknownFactory::CreateInstance(clsid));
         if (!tmp1)
             return E_FAIL;
