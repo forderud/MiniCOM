@@ -5,7 +5,9 @@
 #error Header not intended for Windows platform
 #endif
 
+#define __stdcall 
 #define DECLSPEC_UUID(arg) 
+
 #include <memory>
 #include <cassert>
 #include <atomic>
@@ -97,27 +99,160 @@ enum CLSCTX {
                                  CLSCTX_REMOTE_SERVER)
 
 
+inline const char* InternalHresultToString(HRESULT hr) {
+    switch (hr) {
+    case S_OK:          return "S_OK";
+    case E_BOUNDS:      return "E_BOUNDS";
+    case E_NOTIMPL:     return "E_NOTIMPL";
+    case E_NOINTERFACE: return "E_NOINTERFACE";
+    case E_POINTER:     return "E_POINTER";
+    case E_ABORT:       return "E_ABORT";
+    case E_FAIL:        return "E_FAIL";
+    case E_UNEXPECTED:  return "E_UNEXPECTED";
+    case E_ACCESSDENIED:return "E_ACCESSDENIED";
+    case E_HANDLE:      return "E_HANDLE";
+    case E_OUTOFMEMORY: return "E_OUTOFMEMORY";
+    case E_INVALIDARG:  return "E_INVALIDARG";
+    case E_NOT_SET:     return "E_NOT_SET";
+    default:            return "HRESULT error";
+    }
+}
+
+
 inline void CHECK (HRESULT hr) {
     if (hr >= 0)
         return; // success
 
-    switch (hr) {
-    case E_BOUNDS:      throw std::runtime_error("E_BOUNDS");
-    case E_NOTIMPL:     throw std::runtime_error("E_NOTIMPL");
-    case E_NOINTERFACE: throw std::runtime_error("E_NOINTERFACE");
-    case E_POINTER:     throw std::runtime_error("E_POINTER");
-    case E_ABORT:       throw std::runtime_error("E_ABORT");
-    case E_FAIL:        throw std::runtime_error("E_FAIL");
-    case E_UNEXPECTED:  throw std::runtime_error("E_UNEXPECTED");
-    case E_ACCESSDENIED:throw std::runtime_error("E_ACCESSDENIED");
-    case E_HANDLE:      throw std::runtime_error("E_HANDLE");
-    case E_OUTOFMEMORY: throw std::runtime_error("E_OUTOFMEMORY");
-    case E_INVALIDARG:  throw std::runtime_error("E_INVALIDARG");
-    case E_NOT_SET:     throw std::runtime_error("E_NOT_SET");
-    default:
-            throw std::runtime_error("HRESULT error");
-    }
+    const char* str = InternalHresultToString(hr);
+    throw std::runtime_error(str);
 }
+
+
+/** API-compatible subset of the Microsoft _com_error class documented on https://docs.microsoft.com/en-us/cpp/cpp/com-error-class */
+class _com_error {
+public:
+    _com_error(HRESULT hr) : m_hr(hr) {
+        const char* str = InternalHresultToString(hr);
+
+        size_t len = strlen(str);
+        m_buffer.resize(len, L'\0');
+        mbstowcs(const_cast<wchar_t*>(m_buffer.data()), str, len);
+    }
+
+    HRESULT Error() const noexcept {
+        return m_hr;
+    }
+
+    const wchar_t* ErrorMessage() const noexcept {
+        return m_buffer.c_str();
+    }
+
+private:
+    HRESULT      m_hr = E_FAIL;
+    std::wstring m_buffer;
+};
+
+
+/** API-compatible subset of the Microsoft _bstr_t class documented on https://docs.microsoft.com/en-us/cpp/cpp/bstr-t-class */
+class _bstr_t {
+public:
+    _bstr_t() noexcept = default;
+    
+    _bstr_t(const _bstr_t& s) noexcept {
+        Assign(s.m_str);
+    }
+    _bstr_t(const wchar_t* s) {
+        Assign(s);
+    }
+    _bstr_t(wchar_t* s, bool copy) {
+        if (copy)
+            Assign(s);
+        else
+            m_str = s; // attach to string
+    }
+
+    ~_bstr_t() noexcept {
+        Clear();
+    }
+
+    _bstr_t& operator=(const _bstr_t& s) noexcept {
+        Assign(s.m_str);
+        return *this;
+    }
+    _bstr_t& operator=(const wchar_t* s) {
+        Assign(s);
+        return *this;
+    }
+    
+    _bstr_t& operator+=(const _bstr_t& s) {
+        _bstr_t temp = *this + s;
+        Assign(temp.m_str);
+        return *this;
+    }
+    
+    _bstr_t operator+(const _bstr_t& s) const {
+        auto tmp = std::wstring(m_str) + std::wstring(s.m_str);
+        _bstr_t result(tmp.c_str());
+        return result;
+    }
+
+    operator wchar_t*() const noexcept {
+        return m_str;
+    }
+    
+    bool operator == (const _bstr_t& other) const noexcept {
+        if (m_str && other.m_str)
+            return wcscmp(m_str, other.m_str) == 0;
+
+        return false;
+    }
+    bool operator != (const _bstr_t& other) const noexcept {
+        return !operator == (other);
+    }
+
+    /** Returns string length excluding null termination. */
+    unsigned int length() const noexcept {
+        if (!m_str)
+            return 0;
+
+        return static_cast<unsigned int>(wcslen(m_str));
+    }
+
+    void Assign(const wchar_t* s) {
+        Clear();
+        
+        if (s)
+            m_str = wcsdup(s);
+    }
+
+    BSTR* GetAddress() {
+        Clear();
+        return &m_str;
+    }
+
+    void Attach(wchar_t* s) {
+        Assign(s);
+    }
+
+    wchar_t* Detach() {
+        wchar_t* tmp = m_str;
+        m_str = nullptr;
+        return tmp;
+    }
+
+private:
+    void Clear() {
+        if (!m_str)
+            return;
+
+        free(m_str);
+        m_str = nullptr;
+    }
+    
+    wchar_t* m_str = nullptr;
+};
+static_assert(sizeof(_bstr_t) == sizeof(wchar_t*), "_bstr_t size mismatch");
+
 
 namespace ATL {
 
@@ -245,6 +380,12 @@ private:
 DEFINE_UUIDOF(IUnknown)
 
 
+// error handler required by generated wrapper API headers
+inline void _com_issue_errorex(HRESULT hr, IUnknown*, const IID &) {
+    throw _com_error(hr);
+}
+
+
 class IUnknownFactory {
 public:
     typedef IUnknown* (*Factory)();
@@ -318,6 +459,171 @@ private:
 
 #define OBJECT_ENTRY_AUTO(clsid, cls) \
     __attribute__((weak)) const char* tmp_factory_##cls = IUnknownFactory::RegisterClass<cls>(clsid, #cls);
+
+
+/** Mostly API-compatible subset of the Microsoft _com_ptr_t class documented on https://docs.microsoft.com/en-us/cpp/cpp/com-ptr-t-class */
+template <class T>
+class _com_ptr_t {
+public:
+    _com_ptr_t() noexcept = default;
+
+    /** Matching COM ptr ctor. */
+    _com_ptr_t (T * ptr, bool addref = true) : m_ptr(ptr) {
+        assert(m_ptr && "_com_ptr_t::ctor nullptr.");
+        if (addref)
+            m_ptr->AddRef();
+    }
+    /** Matching smart-ptr ctor. */
+    _com_ptr_t (const _com_ptr_t & other) : m_ptr(other.m_ptr) {
+        assert(m_ptr && "_com_ptr_t::ctor nullptr.");
+        m_ptr->AddRef();
+    }
+    
+    /** Casting smart-ptr ctor. */
+    template<typename Q, std::enable_if_t<!std::is_same<Q, T>::value, bool> = true>   // call _com_ptr_t ctor instead
+    _com_ptr_t(const _com_ptr_t<Q>& ptr) {
+        assert(ptr && "_com_ptr_t::ctor nullptr.");
+        ptr.QueryInterface(__uuidof(T), &m_ptr);
+        assert(m_ptr && "_com_ptr_t::ctor cast failure.");
+    }
+    /** Casting COM ptr ctor. */
+    template<typename Q, std::enable_if_t<!(
+           std::is_same<Q, T>::value          // call T* ctor instead
+        || std::is_same<Q, _com_ptr_t>::value // call _com_ptr_t ctor instead
+        ), bool> = true>
+    _com_ptr_t(Q * ptr) {
+        assert(ptr && "_com_ptr_t::ctor nullptr.");
+        ptr->QueryInterface(__uuidof(T), reinterpret_cast<void**>(&m_ptr));
+        assert(m_ptr && "_com_ptr_t::ctor cast failure.");
+    }
+
+    ~_com_ptr_t () {
+        if (m_ptr)
+            Release();
+    }
+
+    /** Nullptr assignment. */
+    void operator = (std::nullptr_t) {
+        if (m_ptr)
+            Release();
+    }
+    /** Smart-ptr assignment. */
+    void operator = (const _com_ptr_t & other) {
+        if (m_ptr != other.m_ptr)
+            _com_ptr_t(other).Swap(*this);
+    }
+
+    template <class Q>
+    HRESULT QueryInterface (const IID& iid, Q** arg) const {
+        if (!m_ptr)
+            return E_POINTER;
+
+        return m_ptr->QueryInterface(iid, reinterpret_cast<void**>(arg));
+    }
+
+    /** Take over ownership (does not incr. ref-count). */
+    void Attach (T * ptr) {
+        if (m_ptr)
+            Release();
+        m_ptr = ptr;
+        // no AddRef
+    }
+    /** Release ownership (does not decr. ref-count). */
+    T* Detach () {
+        T * tmp = m_ptr;
+        m_ptr = nullptr;
+        // no Release
+        return tmp;
+    }
+
+    void Release () {
+        assert(m_ptr && "_com_ptr_t::Release nullptr.");
+
+        m_ptr->Release();
+        m_ptr = nullptr;
+    }
+
+    operator T*() const noexcept {
+        return m_ptr;
+    }
+
+    operator T& () const {
+        assert(m_ptr && "_com_ptr_t::operator& nullptr.");
+        return *m_ptr;
+    }
+
+    T& operator* () const {
+        assert(m_ptr && "_com_ptr_t::operator* nullptr.");
+        return *m_ptr;
+    }        
+
+    T** operator& () noexcept {
+        if (m_ptr)
+            Release();
+        return &m_ptr;
+    }
+
+    T* operator-> () const {
+        assert(m_ptr && "_com_ptr_t::operator-> nullptr.");
+        m_ptr->_AssertRefCount();
+        return m_ptr;
+    }
+
+    HRESULT CreateInstance (const GUID& clsid, IUnknown* outer = nullptr, DWORD context = CLSCTX_ALL) noexcept {
+        (void)outer;
+        (void)context;
+
+        _com_ptr_t<IUnknown> tmp1(IUnknownFactory::CreateInstance(clsid));
+        if (!tmp1)
+            return E_FAIL;
+
+        _com_ptr_t tmp2 = tmp1; // cast
+        if (!tmp2)
+            return E_NOINTERFACE;
+
+        Swap(tmp2);
+        return S_OK;
+    }
+
+    HRESULT CreateInstance(const wchar_t* name, IUnknown* outer = nullptr, DWORD context = CLSCTX_ALL) noexcept {
+        (void)outer;
+        (void)context;
+
+        if (!name)
+            return E_INVALIDARG;
+
+        // convert name to ASCII
+        std::string a_name(wcslen(name), '\0');
+        wcstombs(const_cast<char*>(a_name.data()), name, a_name.size());
+
+        _com_ptr_t<IUnknown> tmp1(IUnknownFactory::CreateInstance(a_name));
+        if (!tmp1)
+            return E_FAIL;
+
+        _com_ptr_t tmp2 = tmp1; // cast
+        if (!tmp2)
+            return E_NOINTERFACE;
+
+        Swap(tmp2);
+        return S_OK;
+    }
+
+private:
+    T * m_ptr = nullptr;
+
+    void Swap (_com_ptr_t & other) {
+        T* tmp = m_ptr;
+        m_ptr = other.m_ptr;
+        other.m_ptr = tmp;
+    }
+};
+
+// Support _COM_SMARTPTR_TYPEDEF defines in generated wrapper API headers
+#define _COM_SMARTPTR_TYPEDEF(Interface, IID) typedef _com_ptr_t<Interface> Interface ## Ptr
+
+// IUnknown smart-ptr define
+_COM_SMARTPTR_TYPEDEF(IUnknown, __uuidof(IUnknown));
+
 
 namespace ATL {
 
