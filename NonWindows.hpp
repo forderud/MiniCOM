@@ -5,7 +5,6 @@
 #error Header not intended for Windows platform
 #endif
 
-#define __stdcall 
 #define DECLSPEC_UUID(arg) 
 
 #include <memory>
@@ -475,8 +474,8 @@ public:
     }
     /** Matching smart-ptr ctor. */
     _com_ptr_t (const _com_ptr_t & other) : m_ptr(other.m_ptr) {
-        assert(m_ptr && "_com_ptr_t::ctor nullptr.");
-        m_ptr->AddRef();
+        if (m_ptr)
+            m_ptr->AddRef();
     }
     
     /** Casting smart-ptr ctor. */
@@ -674,7 +673,8 @@ public:
     }
 
     bool IsEqualObject (IUnknown * other) const {
-        CComPtr<IUnknown> this_obj = *this;
+        CComPtr<IUnknown> this_obj;
+        this_obj = *this;
         return this_obj == other;
     }
 
@@ -934,6 +934,10 @@ struct CComSafeArray {
         assert(m_ptr->type == SAFEARRAY::TYPE_DATA);
         unsigned char * ptr = &m_ptr->data[idx*m_ptr->elm_size];
         return reinterpret_cast<T&>(*ptr);
+    }
+
+    typename CComTypeWrapper<T>::type& operator [] (int idx) {
+        return GetAt(idx);
     }
 
     HRESULT SetAt (int idx, const T& val, bool copy = true) {
