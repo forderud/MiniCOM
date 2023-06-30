@@ -345,35 +345,18 @@ static constexpr GUID IID_IMessageFilter = {0x00000016,0x0000,0x0000,{0xC0,0x00,
 
 /** IUnknown base-class for Non-Windows platforms. */
 struct IUnknown {
-    IUnknown () : m_ref(0) {}
+    IUnknown () {
+    }
 
     virtual ~IUnknown() {
-        assert(!m_ref && "IUnknown::dtor non-zero ref count.");
     }
 
     /** Cast method. */
     virtual HRESULT QueryInterface (const GUID & iid, /*[out]*/void **obj) = 0;
 
-    virtual ULONG AddRef () {
-        assert((m_ref < MAX_REF_COUNT) && "IUnknown::AddRef negative ref count.");
-        return ++m_ref;
-    }
+    virtual ULONG AddRef () = 0;
 
-    virtual ULONG Release () {
-        ULONG ref = --m_ref;
-        assert((m_ref < MAX_REF_COUNT) && "IUnknown::Release negative ref count.");
-        if (!ref)
-            delete this;
-        return ref;
-    }
-
-    void _AssertRefCount () const {
-        assert((m_ref > 0) && (m_ref < MAX_REF_COUNT) && "IUnknown::_CheckRefCount non-positive ref count.");
-    }
-
-private:
-    std::atomic<ULONG> m_ref;
-    static constexpr ULONG MAX_REF_COUNT = 0xFFFF; // 64k ought to be enough
+    virtual ULONG Release () = 0;
 };
 } // extern "C"
 DEFINE_UUIDOF(IUnknown)
@@ -564,7 +547,6 @@ public:
 
     T* operator-> () const {
         assert(m_ptr && "_com_ptr_t::operator-> nullptr.");
-        m_ptr->_AssertRefCount();
         return m_ptr;
     }
 
@@ -757,7 +739,6 @@ public:
     }
     T* operator -> () const {
         assert(p && "CComPtr::operator -> nullptr.");
-        p->_AssertRefCount();
         return p;
     }
     T** operator & () {
@@ -989,10 +970,7 @@ template <> unsigned int CComSafeArray<IUnknown*>::GetCount () const;
 #define ATL_NO_VTABLE 
 
 // QueryInterface support macros
-#define BEGIN_COM_MAP(CLASS)         IUnknown* GetUnknown () { \
-                                         return static_cast<IUnknown*>(this); \
-                                     } \
-                                     HRESULT QueryInterface (const GUID & iid, /*out*/void **obj) override { \
+#define BEGIN_COM_MAP(CLASS)         HRESULT QueryInterface (const GUID & iid, /*out*/void **obj) override { \
                                            *obj = nullptr;
 
 #define COM_INTERFACE_ENTRY(INTERFACE) if (iid == __uuidof(INTERFACE)) \
@@ -1004,7 +982,20 @@ template <> unsigned int CComSafeArray<IUnknown*>::GetCount () const;
                                            return E_NOINTERFACE; \
                                        AddRef(); \
                                        return S_OK; \
-                                     }
+                                     } \
+                                     ULONG AddRef () override { \
+                                         assert((m_ref < 0xFFFF) && "IUnknown::AddRef negative ref count."); \
+                                         return ++m_ref; \
+                                     } \
+                                     ULONG Release () override { \
+                                         ULONG ref = --m_ref; \
+                                         assert((m_ref < 0xFFFF) && "IUnknown::Release negative ref count."); \
+                                         if (!ref) \
+                                             delete this; \
+                                         return ref; \
+                                     } \
+                                     std::atomic<ULONG> m_ref {0};
+
 
 #define DECLARE_PROTECT_FINAL_CONSTRUCT()
 
