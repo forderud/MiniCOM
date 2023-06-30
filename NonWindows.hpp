@@ -45,12 +45,13 @@ static GUID hold_uuidof () { return {}; }
 
 typedef GUID           IID;
 typedef unsigned int   DWORD;   ///< 32bit unsigned
-typedef bool           BOOL;
+typedef long           BOOL;
 typedef unsigned char  BYTE;
 typedef unsigned short USHORT;  ///< 16bit unsigned
 typedef unsigned int   UINT;    ///< 32bit int
 typedef unsigned int   ULONG;   ///< 32bit unsigned (cannot use 'long' since it's 64bit on 64bit Linux)
 typedef int            LONG;    ///< 32bit int (cannot use 'long' since it can be 64bit)
+typedef short  VARIANT_BOOL;    ///< boolean type that's natively marshaled to C# and Python
 typedef wchar_t*       BSTR;    ///< zero terminated double-byte text string
 typedef int32_t        HRESULT; ///< 32bit signed int (negative values indicate failure)
 typedef void*          HWND;    ///< window handle
