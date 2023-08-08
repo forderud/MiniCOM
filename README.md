@@ -3,14 +3,14 @@ Minimal cross-platform implementation of the [Component Object Model (COM)](http
 
 Designed as a compatibility library to enable building of existing COM/ATL classes with clang or gcc for for Linux, Mac and mobile platforms. Developed due to lack of knowledge of any better alternatives.
 
-Design goals:
+### Design goals
 * Support simple COM classes implemented in ATL.
 * Support most automation-compatible types, so that the same COM classes can be directly accessed from C# and Python (using [comtypes](https://pythonhosted.org/comtypes/)) on Windows without any language wrappers or proxy/stub DLLs for marshaling.
 * Compatiblity with clang and gcc.
 * Compatibility with Linux, Mac, iOS and Android.
 
-Missing features:
-* Complete COM or ATL support. Out-of-process mashaling is for instance not implemented.
+### Missing features
+* Complete COM or ATL support.
 * Wrapper-code-free access from C# and Python on non-Windows.
 * Out-of-process marshalling on non-Windows.
 
