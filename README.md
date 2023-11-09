@@ -14,4 +14,4 @@ Designed as a compatibility library to enable building of existing COM/ATL class
 * Wrapper-code-free access from C# and Python on non-Windows.
 * Out-of-process marshalling on non-Windows.
 
-Please contact the author if you're aware of any better alternative, and he'll be happy to scrap this project.
+Please contact the author if you're aware of any better alternative, and he'll be happy to scrap this project. I'm hoping that Microsoft [xlang](https://github.com/microsoft/xlang) or a simimar project will eventually replace this project, but cross-platform support have so far been postponed.
