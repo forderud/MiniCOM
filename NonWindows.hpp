@@ -785,7 +785,7 @@ struct SAFEARRAY {
 
             ~Buffer() {
                 if (m_ptr && m_owning)
-                    delete m_ptr;
+                    delete[] m_ptr;
                 m_ptr = nullptr;
             }
 
@@ -818,7 +818,7 @@ struct SAFEARRAY {
                 }
                 // delete old buffer
                 if (m_ptr && m_owning)
-                    delete m_ptr;
+                    delete[] m_ptr;
                 // commit changes
                 m_ptr = new_ptr;
                 m_size = size;
