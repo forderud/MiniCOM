@@ -450,6 +450,9 @@ class _com_ptr_t {
 public:
     _com_ptr_t() noexcept = default;
 
+    _com_ptr_t(decltype(nullptr)) noexcept {
+    }
+
     /** Matching COM ptr ctor. */
     _com_ptr_t (T * ptr, bool addref = true) : m_ptr(ptr) {
         assert(m_ptr && "_com_ptr_t::ctor nullptr.");
