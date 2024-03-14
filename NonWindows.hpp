@@ -56,6 +56,7 @@ typedef wchar_t*       BSTR;    ///< zero terminated double-byte text string
 typedef int32_t        HRESULT; ///< 32bit signed int (negative values indicate failure)
 typedef void*          HWND;    ///< window handle
 static_assert(sizeof(int) == 4, "int size not 32bit");
+#define __int64       long long ///< 64bit int (cannot use typedef due to "unsigned __int64" code)
 
 // Common HRESULT codes
 // REF: https://msdn.microsoft.com/en-us/library/windows/desktop/aa378137.aspx
@@ -890,8 +891,10 @@ struct CComSafeArray {
     }
 
     CComSafeArray (SAFEARRAY * obj) {
-        if (obj)
+        if (obj) {
+            assert(obj->elm_size == sizeof(T));
             m_ptr.reset(new SAFEARRAY(*obj));
+        }
     }
 
     ~CComSafeArray () {
@@ -903,6 +906,7 @@ struct CComSafeArray {
     CComSafeArray& operator = (CComSafeArray&&) = default;
 
     HRESULT Attach (SAFEARRAY * obj) {
+        assert(obj->elm_size == sizeof(T));
         m_ptr.reset(obj);
         return S_OK;
     }
@@ -999,7 +1003,23 @@ template <> unsigned int CComSafeArray<IUnknown*>::GetCount () const;
                                          return ref; \
                                      } \
                                      std::atomic<ULONG> m_ref {0};
-
+#define END_COM_MAP_USER_DEFINED_INTERNALADDREF_INTERNALRELEASE() \
+                                        if (iid == __uuidof(IUnknown)) \
+                                            *obj = static_cast<IUnknown*>(this); \
+                                        else \
+                                            return E_NOINTERFACE; \
+                                        AddRef(); \
+                                        return S_OK; \
+                                    } \
+                                    ULONG AddRef() override { \
+                                        return InternalAddRef(); \
+                                    } \
+                                    ULONG Release() override { \
+                                        ULONG ref = InternalRelease(); \
+                                        if (!ref) \
+                                            delete this; \
+                                        return ref; \
+                                    }
 
 #define DECLARE_PROTECT_FINAL_CONSTRUCT()
 
