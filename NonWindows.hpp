@@ -1032,20 +1032,20 @@ class CComMultiThreadModel {};
 template <class ThreadModel>
 class CComObjectRootEx {};
 
-template <class T>
-class CComObject {
+template <class BASE>
+class CComObject : public BASE {
 public:
-    static HRESULT CreateInstance (CComObject<T> ** arg) {
+    static HRESULT CreateInstance (CComObject<BASE> ** arg) {
         assert(arg);
         assert(!*arg);
 
-        *arg = new T;
+        *arg = new CComObject<BASE>();
         return S_OK;
     }
 };
 
 template <class T, const GUID* pclsid = nullptr>
-class CComCoClass : public CComObject<T> {
+class CComCoClass {
 };
 
 
