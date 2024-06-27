@@ -18,7 +18,7 @@ template <class Class>
 class SharedRefBase : public IUnknown {
     static constexpr ULONG EXPIRED_STRONG = 1;
 public:
-    SharedRefBase() : m_child(*this) {
+    SharedRefBase() : m_weak(*this) {
         CComAggObject<Class>::CreateInstance(this, &m_ptr);
         assert(m_ptr);
         m_ptr->AddRef(); // doesn't increase ref-count for this
@@ -47,8 +47,8 @@ public:
             m_refs.AddRef(true);
             return S_OK;
         } else if (iid == __uuidof(IWeakRef)) {
-            // weak reference to child oject
-            *ptr = static_cast<IWeakRef*>(&m_child);
+            // weak reference to child object
+            *ptr = static_cast<IWeakRef*>(&m_weak);
             m_refs.AddRef(false);
             return S_OK;
         }
@@ -80,6 +80,19 @@ public:
     }
 
 protected:
+    template <class T>
+    HRESULT CastAggObject(/*out*/void** ptr) {
+        *ptr = nullptr;
+        if (!m_ptr)
+            return E_NOT_SET;
+
+        // return strong reference pointed-to object
+        *ptr = static_cast<T*>(&m_ptr->m_contained);
+        m_refs.AddRef(true);
+        return S_OK;
+    }
+
+private:
     /** Inner class for managing weak references. */
     class WeakRef : public IWeakRef {
         friend class SharedRefBase;
@@ -144,21 +157,9 @@ protected:
         std::atomic<uint32_t> weak = 0;   // weak ref-count for SharedRef lifetime
     };
 
-    template <class T>
-    HRESULT CastAggObject(/*out*/void** ptr) {
-        *ptr = nullptr;
-        if (!m_ptr)
-            return E_NOT_SET;
-
-        // return strong reference pointed-to object
-        *ptr = static_cast<T*>(&m_ptr->m_contained);
-        m_refs.AddRef(true);
-        return S_OK;
-    }
-
     AtomicRefBlock        m_refs; // Reference-counts. Only touched once per method for thread safety.
     CComAggObject<Class>* m_ptr = nullptr;
-    WeakRef               m_child;
+    WeakRef               m_weak;
     static inline ULONG   s_obj_count = 0;
 };
 
