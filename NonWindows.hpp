@@ -846,7 +846,7 @@ struct SAFEARRAY {
         TYPE_POINTERS,
     };
 
-    SAFEARRAY (TYPE t) : type(t) {
+    SAFEARRAY (TYPE t) : type(t), elm_size(sizeof(void*)) {
         assert(t == TYPE_STRINGS || t == TYPE_POINTERS);
     }
     SAFEARRAY (unsigned int _elm_size, unsigned int count) : type(TYPE_DATA), data(_elm_size*count), elm_size(_elm_size) {
@@ -906,6 +906,7 @@ struct CComSafeArray {
     CComSafeArray& operator = (CComSafeArray&&) = default;
 
     HRESULT Attach (SAFEARRAY * obj) {
+        assert(obj);
         assert(obj->elm_size == sizeof(T));
         m_ptr.reset(obj);
         return S_OK;
