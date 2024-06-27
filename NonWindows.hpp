@@ -985,6 +985,10 @@ template <> unsigned int CComSafeArray<IUnknown*>::GetCount () const;
 #define COM_INTERFACE_ENTRY(INTERFACE) if (iid == __uuidof(INTERFACE)) \
                                            *obj = static_cast<INTERFACE*>(this); \
                                        else
+#define COM_INTERFACE_ENTRY_AGGREGATE(INTERFACE, punk) \
+                                       if (iid == __uuidof(INTERFACE)) \
+                                           *obj = static_cast<INTERFACE*>(&punk->m_contained); \
+                                       else
 #define END_COM_MAP()                  if (iid == __uuidof(IUnknown)) \
                                            *obj = static_cast<IUnknown*>(this); \
                                        else \
@@ -1043,6 +1047,70 @@ public:
         *arg = new CComObject<BASE>();
         return S_OK;
     }
+};
+
+template <class BASE>
+class CComContainedObject : public BASE {
+public:
+    CComContainedObject (IUnknown* pOuterUnknown) : m_pOuterUnknown(pOuterUnknown) {
+    }
+    
+    // forward reference-counting & QI to controlling outer
+    ULONG AddRef () override {
+        return m_pOuterUnknown->AddRef();
+    }
+    ULONG Release () override {
+        return m_pOuterUnknown->Release();
+    }
+    HRESULT QueryInterface (const GUID & iid, /*out*/void **obj) override {
+        return m_pOuterUnknown->QueryInterface(iid, obj);
+    }
+    
+private:
+    IUnknown* m_pOuterUnknown = nullptr;
+};
+
+template <class BASE>
+class CComAggObject : public IUnknown {
+public:
+    CComAggObject (IUnknown* pOuterUnknown) : m_contained(pOuterUnknown) {
+    }
+    ~CComAggObject () {
+    }
+    
+    ULONG AddRef () override {
+        return ++m_ref;
+    }
+    ULONG Release () override {
+        ULONG ref = --m_ref;
+        if (!ref)
+            delete this;
+        
+        return ref;
+    }
+    HRESULT QueryInterface (const GUID & iid, /*out*/void **obj) override {
+        if (iid == __uuidof(IUnknown)) {
+            // special handling of IUnknown
+            *obj = static_cast<IUnknown*>(this);
+            AddRef();
+            return S_OK;
+        } else {
+            return m_contained.QueryInterface(iid, obj);
+        }
+    }
+
+    static HRESULT CreateInstance (IUnknown* unkOuter, CComAggObject<BASE> ** arg) {
+        assert(unkOuter);
+        assert(arg);
+        assert(!*arg);
+
+        *arg = new CComAggObject<BASE>(unkOuter);
+        return S_OK;
+    }
+    
+    CComContainedObject<BASE> m_contained;
+private:
+    std::atomic<ULONG>        m_ref {0};
 };
 
 template <class T, const GUID* pclsid = nullptr>
