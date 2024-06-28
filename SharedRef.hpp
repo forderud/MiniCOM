@@ -1,12 +1,12 @@
 #pragma once
 #include <atomic>
-#include <AppAPI/ComSupport.hpp>
 #include <iostream>
+#include "ComSupport.hpp"
 
 
 /** IUnknown-based alternative to Microsoft's IWeakReference.
     References to this interface are weak, meaning they do not extend the lifetime of the object.
-    Casting back to the parent interface only succeed if the object is still alive. */
+    Casting back to IUnknown and other interfaces only succeed if the object is still alive. */
 struct DECLSPEC_UUID("146532F9-763D-44C9-875A-7B5B732B9046")
 IWeakRef : public IUnknown {
 public:
@@ -16,13 +16,11 @@ public:
 /** Base-class for COM wrapper that provides support for weak references through the IWeakRef interface. */
 template <class Class>
 class SharedRefBase : public IUnknown {
-    static constexpr ULONG EXPIRED_STRONG = 1;
 public:
     SharedRefBase() : m_weak(*this) {
         CComAggObject<Class>::CreateInstance(this, &m_ptr);
         assert(m_ptr);
         m_ptr->AddRef(); // doesn't increase ref-count for this
-        m_refs.AddRef(true);
         ++s_obj_count;
     }
     virtual ~SharedRefBase() {
@@ -31,7 +29,7 @@ public:
     }
 
     /** QueryInterface doesn't adhere to the COM rules, since the interfaces accessible are dynamic.
-        Still, interface disappearance only affect internal IWeakRef clients, so it shouldn't cause problems for external code.
+        Still, interface disappearance only affect IWeakRef clients and is not noticable for clients unaware of this interface.
         DOC: https://learn.microsoft.com/en-us/windows/win32/com/rules-for-implementing-queryinterface */
     HRESULT QueryInterfaceInternal(const IID& iid, void** ptr) {
         if (!ptr)
@@ -63,13 +61,13 @@ public:
     ULONG Release() override {
         RefBlock refs = m_refs.Release(true);
 
-        if (m_ptr && (refs.strong == EXPIRED_STRONG)) {
+        if (m_ptr && !refs.strong) {
             // release object handle
             m_ptr->Release();
             m_ptr = nullptr;
         }
 
-        if ((refs.strong == EXPIRED_STRONG) && !refs.weak)
+        if (!refs.strong && !refs.weak)
             delete this;
 
         return refs.strong;
@@ -102,7 +100,8 @@ private:
         ~WeakRef() {
         }
 
-        /** QueryInterface doesn't adhere to the COM aggregation rules for inner objects, but this is a project-internal pointer that's not shared with anyone.
+        /** QueryInterface doesn't adhere to the COM aggregation rules for inner objects, since it lacks special handling of IUnknown.
+            Still, this only affect IWeakRef clients and is not noticable for clients unaware of this interface.
             DOC: https://learn.microsoft.com/en-us/windows/win32/com/aggregation */
         HRESULT QueryInterface(const IID& iid, void** obj) override {
             return m_parent.QueryInterface(iid, obj);
@@ -114,7 +113,7 @@ private:
 
         ULONG Release() override {
             RefBlock refs = m_parent.m_refs.Release(false);
-            if ((refs.strong == EXPIRED_STRONG) && !refs.weak)
+            if (!refs.strong && !refs.weak)
                 delete &m_parent;
 
             return refs.weak;
