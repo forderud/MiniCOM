@@ -1065,6 +1065,9 @@ public:
     HRESULT QueryInterface (const GUID & iid, /*out*/void **obj) override {
         return m_pOuterUnknown->QueryInterface(iid, obj);
     }
+    HRESULT InternalQueryInterface (const GUID & iid, /*out*/void **obj) {
+        return BASE::QueryInterface(iid, obj);
+    }
     
 private:
     IUnknown* m_pOuterUnknown = nullptr;
@@ -1095,7 +1098,7 @@ public:
             AddRef();
             return S_OK;
         } else {
-            return m_contained.QueryInterface(iid, obj);
+            return m_contained.InternalQueryInterface(iid, obj);
         }
     }
 

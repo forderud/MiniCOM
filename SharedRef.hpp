@@ -12,18 +12,17 @@ IWeakRef : public IUnknown {
 public:
 };
 
-
-/** Base-class for COM wrapper that provides support for weak references through the IWeakRef interface. */
+/** COM wrapper class that provides support for weak references through the IWeakRef interface. */
 template <class Class>
-class SharedRefBase : public IUnknown {
+class SharedRef : public IUnknown {
 public:
-    SharedRefBase() : m_weak(*this) {
+    SharedRef() : m_weak(*this) {
         CComAggObject<Class>::CreateInstance(this, &m_ptr);
         assert(m_ptr);
         m_ptr->AddRef(); // doesn't increase ref-count for this
         ++s_obj_count;
     }
-    virtual ~SharedRefBase() {
+    ~SharedRef() {
         assert(m_ptr == nullptr);
         --s_obj_count;
     }
@@ -31,7 +30,7 @@ public:
     /** QueryInterface doesn't adhere to the COM rules, since the interfaces accessible are dynamic.
         Still, interface disappearance only affect IWeakRef clients and is not noticable for clients unaware of this interface.
         DOC: https://learn.microsoft.com/en-us/windows/win32/com/rules-for-implementing-queryinterface */
-    HRESULT QueryInterfaceInternal(const IID& iid, void** ptr) {
+    HRESULT QueryInterface(const IID& iid, void** ptr) override {
         if (!ptr)
             return E_INVALIDARG;
 
@@ -49,9 +48,9 @@ public:
             *ptr = static_cast<IWeakRef*>(&m_weak);
             m_refs.AddRef(false);
             return S_OK;
+        } else {
+            return m_ptr->QueryInterface(iid, ptr);
         }
-
-        return E_NOINTERFACE;
     }
 
     ULONG AddRef() override {
@@ -73,29 +72,22 @@ public:
         return refs.strong;
     }
 
-    static ULONG ObjectCount() {
-        return s_obj_count;
+    /** Pointer to internal C++ class. Potentially unsafe. Only call immediately after construction. */
+    Class* Internal() const {
+        assert(m_ptr);
+        return &m_ptr->m_contained;
     }
 
-protected:
-    template <class T>
-    HRESULT CastAggObject(/*out*/void** ptr) {
-        *ptr = nullptr;
-        if (!m_ptr)
-            return E_NOT_SET;
-
-        // return strong reference pointed-to object
-        *ptr = static_cast<T*>(&m_ptr->m_contained);
-        m_refs.AddRef(true);
-        return S_OK;
+    static ULONG ObjectCount() {
+        return s_obj_count;
     }
 
 private:
     /** Inner class for managing weak references. */
     class WeakRef : public IWeakRef {
-        friend class SharedRefBase;
+        friend class SharedRef;
     public:
-        WeakRef(SharedRefBase& parent) : m_parent(parent) {
+        WeakRef(SharedRef& parent) : m_parent(parent) {
         }
         ~WeakRef() {
         }
@@ -120,7 +112,7 @@ private:
         }
 
     private:
-        SharedRefBase& m_parent;
+        SharedRef& m_parent;
     };
 
     struct RefBlock {
@@ -160,53 +152,4 @@ private:
     CComAggObject<Class>* m_ptr = nullptr;
     WeakRef               m_weak;
     static inline ULONG   s_obj_count = 0;
-};
-
-
-/** COM wrapper class that provides support for weak references through the IWeakRef interface. */
-template <class Class, class Interface1>
-class SharedRef1 : public SharedRefBase<Class> {
-    using BASE = SharedRefBase<Class>;
-public:
-    HRESULT QueryInterface(const IID& iid, void** ptr) override {
-        if (iid == __uuidof(Interface1)) {
-            return BASE::template CastAggObject<Interface1>(ptr);
-        } else {
-            return BASE::QueryInterfaceInternal(iid, ptr);
-        }
-    }
-};
-
-/** COM wrapper class that provides support for weak references through the IWeakRef interface. */
-template <class Class, class Interface1, class Interface2>
-class SharedRef2 : public SharedRefBase<Class> {
-    using BASE = SharedRefBase<Class>;
-public:
-    HRESULT QueryInterface(const IID& iid, void** ptr) override {
-        if (iid == __uuidof(Interface1)) {
-            return BASE::template CastAggObject<Interface1>(ptr);
-        } else if (iid == __uuidof(Interface2)) {
-            return BASE::template CastAggObject<Interface2>(ptr);
-        } else {
-            return BASE::QueryInterfaceInternal(iid, ptr);
-        }
-    }
-};
-
-/** COM wrapper class that provides support for weak references through the IWeakRef interface. */
-template <class Class, class Interface1, class Interface2, class Interface3>
-class SharedRef3 : public SharedRefBase<Class> {
-    using BASE = SharedRefBase<Class>;
-public:
-    HRESULT QueryInterface(const IID& iid, void** ptr) override {
-        if (iid == __uuidof(Interface1)) {
-            return BASE::template CastAggObject<Interface1>(ptr);
-        } else if (iid == __uuidof(Interface2)) {
-            return BASE::template CastAggObject<Interface2>(ptr);
-        } else if (iid == __uuidof(Interface3)) {
-            return BASE::template CastAggObject<Interface3>(ptr);
-        } else {
-            return BASE::QueryInterfaceInternal(iid, ptr);
-        }
-    }
 };
