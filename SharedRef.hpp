@@ -1,7 +1,6 @@
 #pragma once
 #include <atomic>
 #include <iostream>
-#include "ComSupport.hpp"
 
 
 /** IUnknown-based alternative to Microsoft's IWeakReference.
