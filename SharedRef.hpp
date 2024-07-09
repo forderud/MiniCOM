@@ -48,6 +48,9 @@ public:
             m_refs.AddRef(false);
             return S_OK;
         } else {
+            if (!m_ptr)
+                return E_NOT_SET;
+
             return m_ptr->QueryInterface(iid, ptr);
         }
     }
