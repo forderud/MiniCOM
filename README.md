@@ -16,4 +16,4 @@ Designed as a compatibility library to enable building of existing COM/ATL class
 Please contact the author if you're aware of any better alternative, and he'll be happy to scrap this project. I'm hoping that Microsoft [xlang](https://github.com/microsoft/xlang) or a similar project will eventually replace this project, but cross-platform support have so far been postponed.
 
 ## Shared & weak references
-The repo also contains a [`SharedRef`](SharedRef.hpp) wrapper class to support non-owning weak-references through a `IWeakRef` interface. This is similar to `IWeakReference`, but is also compatible with classical `IUnknown`-based COM.
+The repo also contains a [`SharedRef`](SharedRef.hpp) wrapper class for non-owning weak-references through a `IWeakRef` interface. This is similar to `IWeakReference`, but is also compatible with classical `IUnknown`-based COM.
