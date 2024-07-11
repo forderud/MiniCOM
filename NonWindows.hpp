@@ -1041,7 +1041,12 @@ class CComSingleThreadModel {};
 class CComMultiThreadModel {};
 
 template <class ThreadModel>
-class CComObjectRootEx {};
+class CComObjectRootEx {
+public:
+    HRESULT FinalConstruct() {
+        return S_OK;
+    }
+};
 
 template <class BASE>
 class CComObject : public BASE {
@@ -1050,8 +1055,15 @@ public:
         assert(arg);
         assert(!*arg);
 
-        *arg = new CComObject<BASE>();
-        return S_OK;
+        auto* ptr = new CComObject<BASE>();
+        HRESULT hr = ptr->FinalConstruct();
+        if (FAILED(hr)) {
+            delete ptr;
+            ptr = nullptr;
+        }
+
+        *arg = ptr;
+        return hr;
     }
 };
 
@@ -1113,8 +1125,15 @@ public:
         assert(arg);
         assert(!*arg);
 
-        *arg = new CComAggObject<BASE>(unkOuter);
-        return S_OK;
+        auto* ptr = new CComAggObject<BASE>(unkOuter);
+        HRESULT hr = ptr->m_contained.FinalConstruct();
+        if (FAILED(hr)) {
+            delete ptr;
+            ptr = nullptr;
+        }
+
+        *arg = ptr;
+        return hr;
     }
     
     CComContainedObject<BASE> m_contained;
