@@ -3,7 +3,6 @@
 # * Change TLI include from absolute to relative path
 # * Replace C-style structs with C++ RAII structs from cpp_quote lines in the IDL files
 # * Insert free functions from cpp_quote lines in the IDL files
-from __future__ import print_function # Python 2.7 compatibilit
 import fileinput
 import os
 import sys
