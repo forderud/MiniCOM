@@ -1,6 +1,10 @@
 #pragma once
 #include <atomic>
-#include <iostream>
+#ifdef _WIN32
+  #include <atlcom.h>
+#else
+  #include "NonWindows.hpp"
+#endif
 
 
 /** IUnknown-based alternative to Microsoft's IWeakReference.
@@ -8,7 +12,6 @@
     Casting back to IUnknown and other interfaces only succeed if the object is still alive. */
 struct DECLSPEC_UUID("146532F9-763D-44C9-875A-7B5B732B9046")
 IWeakRef : public IUnknown {
-public:
 };
 
 /** COM wrapper class that provides support for weak references through the IWeakRef interface. */
