@@ -64,8 +64,9 @@ public:
 
         if (m_ptr && !refs.strong) {
             // release object handle
-            m_ptr->Release();
+            auto* ptr = m_ptr;
             m_ptr = nullptr;
+            ptr->Release(); // might trigger reentrancy, so don't touch members afterwards
         }
 
         if (!refs.strong && !refs.weak)
