@@ -220,6 +220,9 @@ public:
     }
 
     void Assign(const wchar_t* s) {
+        if (s == m_str)
+            return; // self-assignment
+
         Clear();
         
         if (s)
@@ -277,6 +280,9 @@ public:
     }
 
     void operator = (const CComBSTR & other) {
+        if (&other == this)
+            return;
+
         Empty();
         m_str = other.Copy();
     }
