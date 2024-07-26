@@ -1014,23 +1014,6 @@ template <> unsigned int CComSafeArray<IUnknown*>::GetCount () const;
                                          return ref; \
                                      } \
                                      std::atomic<ULONG> m_ref {0};
-#define END_COM_MAP_USER_DEFINED_INTERNALADDREF_INTERNALRELEASE() \
-                                        if (iid == __uuidof(IUnknown)) \
-                                            *obj = static_cast<IUnknown*>(this); \
-                                        else \
-                                            return E_NOINTERFACE; \
-                                        AddRef(); \
-                                        return S_OK; \
-                                    } \
-                                    ULONG AddRef() override { \
-                                        return InternalAddRef(); \
-                                    } \
-                                    ULONG Release() override { \
-                                        ULONG ref = InternalRelease(); \
-                                        if (!ref) \
-                                            delete this; \
-                                        return ref; \
-                                    }
 
 #define DECLARE_PROTECT_FINAL_CONSTRUCT()
 
