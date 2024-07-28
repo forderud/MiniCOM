@@ -1,4 +1,4 @@
-Minimal cross-platform implementation of the [Component Object Model (COM)](https://docs.microsoft.com/en-us/windows/win32/com/the-component-object-model) runtime and [Active Template Library (ATL)](https://docs.microsoft.com/en-us/cpp/atl/atl-com-desktop-components).
+Partial cross-platform implementation of the [Component Object Model (COM)](https://docs.microsoft.com/en-us/windows/win32/com/the-component-object-model) runtime and [Active Template Library (ATL)](https://docs.microsoft.com/en-us/cpp/atl/atl-com-desktop-components).
 
 Designed as a compatibility library to enable building of existing COM/ATL classes with clang or gcc for for Linux, Mac and mobile platforms. Developed due to lack of knowledge of any better alternatives.
 
