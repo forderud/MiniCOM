@@ -476,8 +476,9 @@ public:
     template<typename Q, std::enable_if_t<!std::is_same<Q, T>::value, bool> = true>   // call _com_ptr_t ctor instead
     _com_ptr_t(const _com_ptr_t<Q>& ptr) {
         assert(ptr && "_com_ptr_t::ctor nullptr.");
-        ptr.QueryInterface(__uuidof(T), &m_ptr);
-        assert(m_ptr && "_com_ptr_t::ctor cast failure.");
+        HRESULT hr = ptr.QueryInterface(__uuidof(T), &m_ptr);
+        assert(((hr == S_OK) || (hr == E_NOINTERFACE)) && "_com_ptr_t::ctor cast failure.");
+        (void)hr; // mute unreferenced variable warning
     }
     /** Casting COM ptr ctor. */
     template<typename Q, std::enable_if_t<!(
@@ -486,8 +487,9 @@ public:
         ), bool> = true>
     _com_ptr_t(Q * ptr) {
         assert(ptr && "_com_ptr_t::ctor nullptr.");
-        ptr->QueryInterface(__uuidof(T), reinterpret_cast<void**>(&m_ptr));
-        assert(m_ptr && "_com_ptr_t::ctor cast failure.");
+        HRESULT hr = ptr->QueryInterface(__uuidof(T), reinterpret_cast<void**>(&m_ptr));
+        assert(((hr == S_OK) || (hr == E_NOINTERFACE)) && "_com_ptr_t::ctor cast failure.");
+        (void)hr; // mute unreferenced variable warning
     }
 
     ~_com_ptr_t () {
