@@ -192,7 +192,7 @@ def ParseSafeArray (source):
             return 'SAFEARRAY *'
 
     # pattern to match 'SAFEARRAY(byte)' and similar
-    pattern = re.compile('SAFEARRAY\([a-zA-Z0-9_\*]+?\)') # matches a-z, A-Z, '_' & '*'
+    pattern = re.compile('SAFEARRAY\([a-zA-Z0-9_\s\*]+?\)') # matches a-z, A-Z, '_' & '*'
     # convert to SAFEARRAY pointer
     source = pattern.sub(ReplaceFun, source)
     return source
