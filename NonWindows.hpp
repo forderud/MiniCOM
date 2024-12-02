@@ -105,6 +105,7 @@ enum CLSCTX {
 inline const char* InternalHresultToString(HRESULT hr) {
     switch (hr) {
     case S_OK:          return "S_OK";
+    case S_FALSE:       return "S_FALSE";
     case E_BOUNDS:      return "E_BOUNDS";
     case E_NOTIMPL:     return "E_NOTIMPL";
     case E_NOINTERFACE: return "E_NOINTERFACE";
