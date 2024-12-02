@@ -55,12 +55,14 @@ typedef short  VARIANT_BOOL;    ///< boolean type that's natively marshaled to C
 typedef wchar_t*       BSTR;    ///< zero terminated double-byte text string
 typedef int32_t        HRESULT; ///< 32bit signed int (negative values indicate failure)
 typedef void*          HWND;    ///< window handle
+typedef unsigned long long  ULONGLONG; ///< 64bit unsigned
 static_assert(sizeof(int) == 4, "int size not 32bit");
 #define __int64       long long ///< 64bit int (cannot use typedef due to "unsigned __int64" code)
 
 // Common HRESULT codes
 // REF: https://msdn.microsoft.com/en-us/library/windows/desktop/aa378137.aspx
 #define S_OK           static_cast<int32_t>(0L)
+#define S_FALSE        static_cast<int32_t>(1L)
 #define E_BOUNDS       static_cast<int32_t>(0x8000000BL)
 #define E_NOTIMPL      static_cast<int32_t>(0x80004001L)
 #define E_NOINTERFACE  static_cast<int32_t>(0x80004002L)
