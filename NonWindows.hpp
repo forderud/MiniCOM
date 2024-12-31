@@ -17,6 +17,7 @@
 #include <locale>
 #include <map>
 #include <iostream>
+#include <type_traits>
 
 
 /** Taken from guiddef.h. */
@@ -445,6 +446,7 @@ public:
     
     template <class CLS>
     static const char* RegisterClass(GUID clsid, const char * class_name) {
+        //printf("IUnknownFactory::RegisterClass(%s)\n", class_name);
         Factories()[{clsid,class_name}] = CreateClass<CLS>;
         return class_name; // pass-through name
     }
@@ -1004,6 +1006,8 @@ template <> unsigned int CComSafeArray<IUnknown*>::GetCount () const;
 
 // QueryInterface support macros
 #define BEGIN_COM_MAP(CLASS)         HRESULT QueryInterface (const GUID & iid, /*out*/void **obj) override { \
+                                           static_assert(std::is_same_v<CLASS, std::remove_pointer_t<decltype(this)>>, \
+                                               "Argument to BEGIN_COM_MAP doesn't match name of surrounding class."); \
                                            *obj = nullptr;
 
 #define COM_INTERFACE_ENTRY(INTERFACE) if (iid == __uuidof(INTERFACE)) \
