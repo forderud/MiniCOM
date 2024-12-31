@@ -896,9 +896,11 @@ struct CComTypeWrapper<IUnknown*> {
 
 template <class T>
 struct CComSafeArray {
-    CComSafeArray (UINT size = 0) {
-        if (size)
-            m_ptr.reset(new SAFEARRAY(sizeof(T), size));
+    CComSafeArray () {
+    }
+
+    CComSafeArray (UINT size) {
+        m_ptr.reset(new SAFEARRAY(sizeof(T), size));
     }
 
     CComSafeArray (SAFEARRAY * obj) {
@@ -953,7 +955,10 @@ struct CComSafeArray {
 
     HRESULT Add (const typename CComTypeWrapper<T>::type& t, BOOL copy = true) {
         (void)copy; // mute unreferenced argument warning
-        assert(m_ptr);
+        
+        if (!m_ptr)
+            m_ptr.reset(new SAFEARRAY(sizeof(T), 0)); // lazy initialization
+
         assert(m_ptr->type == SAFEARRAY::TYPE_DATA);
         assert(sizeof(T) == m_ptr->elm_size);
         const size_t prev_size = m_ptr->data.size();

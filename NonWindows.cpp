@@ -29,14 +29,20 @@ template <> ATL::CComTypeWrapper<IUnknown*>::type& CComSafeArray<IUnknown*>::Get
 
 template <> HRESULT ATL::CComSafeArray<BSTR>::Add (const typename CComTypeWrapper<BSTR>::type& t, BOOL copy) {
     (void)copy; // mute unreferenced argument warning
-    assert(m_ptr);
+
+    if (!m_ptr)
+        m_ptr.reset(new SAFEARRAY(SAFEARRAY::TYPE_STRINGS)); // lazy initialization
+
     assert(m_ptr->type == SAFEARRAY::TYPE_STRINGS);
     m_ptr->strings.push_back(t);
     return S_OK;
 }
 template <> HRESULT ATL::CComSafeArray<IUnknown*>::Add (const typename CComTypeWrapper<IUnknown*>::type& t, BOOL copy) {
     (void)copy; // mute unreferenced argument warning
-    assert(m_ptr);
+
+    if (!m_ptr)
+        m_ptr.reset(new SAFEARRAY(SAFEARRAY::TYPE_POINTERS)); // lazy initialization
+
     assert(m_ptr->type == SAFEARRAY::TYPE_POINTERS);
     m_ptr->pointers.push_back(t);
     return S_OK;
