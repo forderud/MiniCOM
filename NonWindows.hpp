@@ -306,6 +306,14 @@ public:
         return &m_str;
     }
     
+    void Attach(wchar_t* s) noexcept {
+        if (s == m_str)
+            return;
+
+        Empty();
+        m_str = s;
+    }
+    
     wchar_t* Detach () {
         wchar_t* tmp = m_str;
         m_str = nullptr;
@@ -333,9 +341,9 @@ public:
         return *this;
     }
 
-    bool operator == (const wchar_t* other) const {
-        if (m_str && other)
-            return wcscmp(m_str, other) == 0;
+    bool operator == (const CComBSTR& other) const {
+        if (m_str && other.m_str)
+            return wcscmp(m_str, other.m_str) == 0;
 
         return false;
     }
