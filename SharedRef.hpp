@@ -12,13 +12,14 @@
     Casting back to IUnknown and other interfaces only succeed if the object is still alive. */
 struct DECLSPEC_UUID("146532F9-763D-44C9-875A-7B5B732B9046")
 IWeakRef : public IUnknown {
+    virtual HRESULT GetOwner(ULONGLONG* owner) = 0; 
 };
 
 /** COM wrapper class that provides support for weak references through the IWeakRef interface. */
 template <class Class>
 class SharedRef : public IUnknown {
 public:
-    SharedRef() : m_weak(*this) {
+    SharedRef(ULONGLONG owner = 0) : m_weak(*this), m_owner(owner) {
         CComAggObject<Class>::CreateInstance(this, &m_ptr);
         assert(m_ptr);
         m_ptr->AddRef(); // doesn't increase ref-count for this
@@ -98,6 +99,15 @@ private:
         ~WeakRef() {
         }
 
+        /** Get opaque identifier for the owning object. Shall NOT be dereferenced. */
+        HRESULT GetOwner(ULONGLONG* owner) override {
+            if (!owner)
+                return E_INVALIDARG;
+
+            *owner = m_parent.m_owner;
+            return S_OK;
+        }
+
         /** QueryInterface doesn't adhere to the COM aggregation rules for inner objects, since it lacks special handling of IUnknown.
             Still, this only affect IWeakRef clients and is not noticable for clients unaware of this interface.
             DOC: https://learn.microsoft.com/en-us/windows/win32/com/aggregation */
@@ -157,5 +167,6 @@ private:
     AtomicRefBlock        m_refs; // Reference-counts. Only touched once per method for thread safety.
     CComAggObject<Class>* m_ptr = nullptr;
     WeakRef               m_weak;
+    ULONGLONG             m_owner = 0; // Opaque owning object identifier. Shall NOT be dereferenced.
     static inline ULONG   s_obj_count = 0;
 };
