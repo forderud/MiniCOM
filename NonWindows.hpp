@@ -520,6 +520,16 @@ public:
         if (m_ptr != other.m_ptr)
             _com_ptr_t(other).Swap(*this);
     }
+    
+    _com_ptr_t& operator=(_com_ptr_t&& other) noexcept {
+        if (m_ptr != other.m_ptr) {
+            if (m_ptr)
+                Release();
+            std::swap(m_ptr, other.m_ptr);
+        }
+
+        return *this;
+    }
 
     template <class Q>
     HRESULT QueryInterface (const IID& iid, Q** arg) const {
@@ -666,6 +676,16 @@ public:
         CComPtr tmp;
         other.QueryInterface(&tmp);
         Swap(tmp);
+    }
+    
+    CComPtr& operator=(CComPtr&& other) noexcept {
+        if (p != other.p) {
+            if (p)
+                Release();
+            std::swap(p, other.p);
+        }
+
+        return *this;
     }
 
     template <class Q>
