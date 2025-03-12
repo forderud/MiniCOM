@@ -102,6 +102,8 @@ enum CLSCTX {
                                  CLSCTX_LOCAL_SERVER| \
                                  CLSCTX_REMOTE_SERVER)
 
+#define SUCCEEDED(hr) (((HRESULT)(hr)) >= 0)
+#define FAILED(hr)    (((HRESULT)(hr)) < 0)
 
 inline const char* InternalHresultToString(HRESULT hr) {
     switch (hr) {
@@ -387,13 +389,105 @@ inline void _com_issue_errorex(HRESULT hr, IUnknown*, const IID &) {
     throw _com_error(hr);
 }
 
+template <class BASE>
+class CComObject : public BASE {
+public:
+    static HRESULT CreateInstance (CComObject<BASE> ** arg) {
+        assert(arg);
+        assert(!*arg);
+
+        auto* ptr = new CComObject<BASE>();
+        HRESULT hr = ptr->FinalConstruct();
+        if (FAILED(hr)) {
+            delete ptr;
+            ptr = nullptr;
+        }
+
+        *arg = ptr;
+        return hr;
+    }
+};
+
+template <class BASE>
+class CComContainedObject : public BASE {
+public:
+    CComContainedObject (IUnknown* pOuterUnknown) : m_pOuterUnknown(pOuterUnknown) {
+    }
+    
+    // forward reference-counting & QI to controlling outer
+    ULONG AddRef () override {
+        return m_pOuterUnknown->AddRef();
+    }
+    ULONG Release () override {
+        return m_pOuterUnknown->Release();
+    }
+    HRESULT QueryInterface (const GUID & iid, /*out*/void **obj) override {
+        return m_pOuterUnknown->QueryInterface(iid, obj);
+    }
+    HRESULT InternalQueryInterface (const GUID & iid, /*out*/void **obj) {
+        return BASE::QueryInterface(iid, obj);
+    }
+    
+private:
+    IUnknown* m_pOuterUnknown = nullptr;
+};
+
+template <class BASE>
+class CComAggObject : public IUnknown {
+public:
+    CComAggObject (IUnknown* pOuterUnknown) : m_contained(pOuterUnknown) {
+    }
+    ~CComAggObject () {
+    }
+    
+    ULONG AddRef () override {
+        return ++m_ref;
+    }
+    ULONG Release () override {
+        ULONG ref = --m_ref;
+        if (!ref)
+            delete this;
+        
+        return ref;
+    }
+    HRESULT QueryInterface (const GUID & iid, /*out*/void **obj) override {
+        if (iid == __uuidof(IUnknown)) {
+            // special handling of IUnknown
+            *obj = static_cast<IUnknown*>(this);
+            AddRef();
+            return S_OK;
+        } else {
+            return m_contained.InternalQueryInterface(iid, obj);
+        }
+    }
+
+    static HRESULT CreateInstance (IUnknown* unkOuter, CComAggObject<BASE> ** arg) {
+        assert(unkOuter);
+        assert(arg);
+        assert(!*arg);
+
+        auto* ptr = new CComAggObject<BASE>(unkOuter);
+        HRESULT hr = ptr->m_contained.FinalConstruct();
+        if (FAILED(hr)) {
+            delete ptr;
+            ptr = nullptr;
+        }
+
+        *arg = ptr;
+        return hr;
+    }
+    
+    CComContainedObject<BASE> m_contained;
+private:
+    std::atomic<ULONG>        m_ref {0};
+};
 
 class IUnknownFactory {
 public:
-    typedef IUnknown* (*Factory)();
+    typedef HRESULT(*Factory)(IUnknown*, IUnknown**);
 
     /** Create COM class based on "[<Program>.]<Component>[.<Version>]" ProgID string. */
-    static IUnknown* CreateInstance (std::string class_name) {
+    static IUnknown* CreateInstance (std::string class_name, IUnknown* outer) {
         // remove "<Program>." prefix and ".<Version>" suffix if present
         size_t idx1 = class_name.find('.');
         if (idx1 != std::string::npos) {
@@ -416,7 +510,11 @@ public:
 
         for (const auto & elm : Factories()) {
             if (elm.first.second == class_name) {
-                return elm.second();
+                IUnknown* obj = nullptr;
+                HRESULT hr = elm.second(outer, &obj);
+                assert(hr == S_OK);
+                if (SUCCEEDED(hr))
+                    return obj;
             }
         }
 
@@ -426,10 +524,14 @@ public:
     }
 
     /** Create COM class based on CLSID. */
-    static IUnknown* CreateInstance (GUID clsid) {
+    static IUnknown* CreateInstance (GUID clsid, IUnknown* outer) {
         for (const auto & elm : Factories()) {
             if (elm.first.first == clsid) {
-                return elm.second();
+                IUnknown* obj = nullptr;
+                HRESULT hr = elm.second(outer, &obj);
+                assert(hr == S_OK);
+                if (SUCCEEDED(hr))
+                    return obj;
             }
         }
 
@@ -453,8 +555,28 @@ public:
 
 private:
     template <class CLS>
-    static IUnknown* CreateClass () {
-        return new CLS;
+    static HRESULT CreateClass (IUnknown* outer, IUnknown** obj) {
+        if (outer) {
+            // create an object (with ref. count zero)
+            CComAggObject<CLS> * tmp = nullptr;
+            HRESULT hr = CComAggObject<CLS>::CreateInstance(outer, &tmp);
+            if (FAILED(hr))
+                return hr;
+
+            tmp->AddRef(); // incr. ref-count to one
+            *obj = tmp;
+            return hr;
+        } else {
+            // create an object (with ref. count zero)
+            CComObject<CLS> * tmp = nullptr;
+            HRESULT hr = CComObject<CLS>::CreateInstance(&tmp);
+            if (FAILED(hr))
+                return hr;
+
+            tmp->AddRef(); // incr. ref-count to one
+            *obj = tmp;
+            return hr;
+        }
     }
 
     static std::map<std::pair<GUID,std::string>, Factory> & Factories ();
@@ -520,7 +642,7 @@ public:
         if (m_ptr != other.m_ptr)
             _com_ptr_t(other).Swap(*this);
     }
-    
+
     _com_ptr_t& operator=(_com_ptr_t&& other) noexcept {
         if (m_ptr != other.m_ptr) {
             if (m_ptr)
@@ -587,10 +709,9 @@ public:
     }
 
     HRESULT CreateInstance (const GUID& clsid, IUnknown* outer = nullptr, DWORD context = CLSCTX_ALL) noexcept {
-        (void)outer;
         (void)context;
 
-        _com_ptr_t<IUnknown> tmp1(IUnknownFactory::CreateInstance(clsid));
+        _com_ptr_t<IUnknown> tmp1(IUnknownFactory::CreateInstance(clsid, outer));
         if (!tmp1)
             return E_FAIL;
 
@@ -603,7 +724,6 @@ public:
     }
 
     HRESULT CreateInstance(const wchar_t* name, IUnknown* outer = nullptr, DWORD context = CLSCTX_ALL) noexcept {
-        (void)outer;
         (void)context;
 
         if (!name)
@@ -613,7 +733,7 @@ public:
         std::string a_name(wcslen(name), '\0');
         wcstombs(const_cast<char*>(a_name.data()), name, a_name.size());
 
-        _com_ptr_t<IUnknown> tmp1(IUnknownFactory::CreateInstance(a_name));
+        _com_ptr_t<IUnknown> tmp1(IUnknownFactory::CreateInstance(a_name, outer));
         if (!tmp1)
             return E_FAIL;
 
@@ -677,7 +797,7 @@ public:
         other.QueryInterface(&tmp);
         Swap(tmp);
     }
-    
+
     CComPtr& operator=(CComPtr&& other) noexcept {
         if (p != other.p) {
             if (p)
@@ -720,14 +840,13 @@ public:
     }
 
     HRESULT CoCreateInstance (std::wstring name, IUnknown* outer = NULL, DWORD context = CLSCTX_ALL) {
-        (void)outer;
         (void)context;
 
         // convert name to ASCII
         std::string a_name(name.size(), '\0');
         wcstombs(const_cast<char*>(a_name.data()), name.c_str(), a_name.size());
 
-        CComPtr<IUnknown> tmp1(IUnknownFactory::CreateInstance(a_name));
+        CComPtr<IUnknown> tmp1(IUnknownFactory::CreateInstance(a_name, outer));
         if (!tmp1)
             return E_FAIL;
 
@@ -741,10 +860,9 @@ public:
     }
 
     HRESULT CoCreateInstance (GUID clsid, IUnknown* outer = NULL, DWORD context = CLSCTX_ALL) {
-        (void)outer;
         (void)context;
 
-        CComPtr<IUnknown> tmp1(IUnknownFactory::CreateInstance(clsid));
+        CComPtr<IUnknown> tmp1(IUnknownFactory::CreateInstance(clsid, outer));
         if (!tmp1)
             return E_FAIL;
 
@@ -948,6 +1066,11 @@ struct CComSafeArray {
     CComSafeArray& operator = (const CComSafeArray&) = delete;
     CComSafeArray& operator = (CComSafeArray&&) = default;
 
+    HRESULT Destroy() {
+        m_ptr.reset();
+        return S_OK;
+    }
+
     HRESULT Attach (SAFEARRAY * obj) {
         assert(obj);
         assert(obj->elm_size == sizeof(T));
@@ -1016,9 +1139,6 @@ template <> unsigned int CComSafeArray<BSTR>::GetCount () const;
 template <> unsigned int CComSafeArray<IUnknown*>::GetCount () const;
 
 
-#define SUCCEEDED(hr) (((HRESULT)(hr)) >= 0)
-#define FAILED(hr)    (((HRESULT)(hr)) < 0)
-
 // COM calling convention (use default on non-Windows)
 #define STDMETHODCALLTYPE
 
@@ -1071,99 +1191,6 @@ public:
     HRESULT FinalConstruct() {
         return S_OK;
     }
-};
-
-template <class BASE>
-class CComObject : public BASE {
-public:
-    static HRESULT CreateInstance (CComObject<BASE> ** arg) {
-        assert(arg);
-        assert(!*arg);
-
-        auto* ptr = new CComObject<BASE>();
-        HRESULT hr = ptr->FinalConstruct();
-        if (FAILED(hr)) {
-            delete ptr;
-            ptr = nullptr;
-        }
-
-        *arg = ptr;
-        return hr;
-    }
-};
-
-template <class BASE>
-class CComContainedObject : public BASE {
-public:
-    CComContainedObject (IUnknown* pOuterUnknown) : m_pOuterUnknown(pOuterUnknown) {
-    }
-    
-    // forward reference-counting & QI to controlling outer
-    ULONG AddRef () override {
-        return m_pOuterUnknown->AddRef();
-    }
-    ULONG Release () override {
-        return m_pOuterUnknown->Release();
-    }
-    HRESULT QueryInterface (const GUID & iid, /*out*/void **obj) override {
-        return m_pOuterUnknown->QueryInterface(iid, obj);
-    }
-    HRESULT InternalQueryInterface (const GUID & iid, /*out*/void **obj) {
-        return BASE::QueryInterface(iid, obj);
-    }
-    
-private:
-    IUnknown* m_pOuterUnknown = nullptr;
-};
-
-template <class BASE>
-class CComAggObject : public IUnknown {
-public:
-    CComAggObject (IUnknown* pOuterUnknown) : m_contained(pOuterUnknown) {
-    }
-    ~CComAggObject () {
-    }
-    
-    ULONG AddRef () override {
-        return ++m_ref;
-    }
-    ULONG Release () override {
-        ULONG ref = --m_ref;
-        if (!ref)
-            delete this;
-        
-        return ref;
-    }
-    HRESULT QueryInterface (const GUID & iid, /*out*/void **obj) override {
-        if (iid == __uuidof(IUnknown)) {
-            // special handling of IUnknown
-            *obj = static_cast<IUnknown*>(this);
-            AddRef();
-            return S_OK;
-        } else {
-            return m_contained.InternalQueryInterface(iid, obj);
-        }
-    }
-
-    static HRESULT CreateInstance (IUnknown* unkOuter, CComAggObject<BASE> ** arg) {
-        assert(unkOuter);
-        assert(arg);
-        assert(!*arg);
-
-        auto* ptr = new CComAggObject<BASE>(unkOuter);
-        HRESULT hr = ptr->m_contained.FinalConstruct();
-        if (FAILED(hr)) {
-            delete ptr;
-            ptr = nullptr;
-        }
-
-        *arg = ptr;
-        return hr;
-    }
-    
-    CComContainedObject<BASE> m_contained;
-private:
-    std::atomic<ULONG>        m_ref {0};
 };
 
 template <class T, const GUID* pclsid = nullptr>
