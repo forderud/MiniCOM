@@ -133,7 +133,7 @@ def AddFunctionsToSource(source, functions):
 
 
 def MakeTliIncludeRelative(source, tli_file):
-    '''Replace #include "<absolute-path>\<filename>.tli" with #include "<filename>.tli"'''
+    '''Replace #include "<absolute-path>\\<filename>.tli" with #include "<filename>.tli"'''
     # remove path prefix
     idx = tli_file.rfind('\\')
     if idx:
