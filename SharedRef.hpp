@@ -16,17 +16,12 @@ IWeakRef : public IUnknown {
 };
 
 /** COM wrapper class that provides support for weak references through the IWeakRef interface. */
-template <class Class>
-class SharedRef : public IUnknown {
+class SharedRefBase : public IUnknown {
 public:
-    SharedRef(ULONGLONG owner = 0) : m_weak(*this), m_owner(owner) {
-        CComAggObject<Class>::CreateInstance(this, &m_ptr);
-        assert(m_ptr);
-        m_ptr->AddRef(); // doesn't increase ref-count for this
+    SharedRefBase() : m_weak(*this) {
         ++s_obj_count;
     }
-    ~SharedRef() {
-        assert(m_ptr == nullptr);
+    virtual ~SharedRefBase() {
         --s_obj_count;
     }
 
@@ -39,7 +34,7 @@ public:
 
         *ptr = nullptr;
         if (iid == IID_IUnknown) {
-            if (!m_ptr)
+            if (!Inner())
                 return E_NOT_SET;
 
             // strong reference to this
@@ -52,10 +47,10 @@ public:
             m_refs.AddRef(false);
             return S_OK;
         } else {
-            if (!m_ptr)
+            if (!Inner())
                 return E_NOT_SET;
 
-            return m_ptr->QueryInterface(iid, ptr);
+            return Inner()->QueryInterface(iid, ptr);
         }
     }
 
@@ -66,10 +61,10 @@ public:
     ULONG Release() override {
         RefBlock refs = m_refs.Release(true);
 
-        if (m_ptr && !refs.strong) {
+        if (Inner() && !refs.strong) {
             // release object handle
-            auto* ptr = m_ptr;
-            m_ptr = nullptr;
+            auto* ptr = Inner();
+            ClearInner();
             ptr->Release(); // might trigger reentrancy, so don't touch members afterwards
         }
 
@@ -79,33 +74,18 @@ public:
         return refs.strong;
     }
 
-    /** Pointer to internal C++ class. Potentially unsafe. Only call immediately after construction. */
-    Class* Internal() const {
-        assert(m_ptr);
-        return &m_ptr->m_contained;
-    }
-
     static ULONG ObjectCount() {
         return s_obj_count;
     }
 
-private:
+protected:
     /** Inner class for managing weak references. */
     class WeakRef : public IWeakRef {
-        friend class SharedRef;
+        friend class SharedRefBase;
     public:
-        WeakRef(SharedRef& parent) : m_parent(parent) {
+        WeakRef(SharedRefBase& parent) : m_parent(parent) {
         }
         ~WeakRef() {
-        }
-
-        /** Get opaque identifier for the owning object. Shall NOT be dereferenced. */
-        HRESULT GetOwner(ULONGLONG* owner) override {
-            if (!owner)
-                return E_INVALIDARG;
-
-            *owner = m_parent.m_owner;
-            return S_OK;
         }
 
         /** QueryInterface doesn't adhere to the COM aggregation rules for inner objects, since it lacks special handling of IUnknown.
@@ -128,12 +108,12 @@ private:
         }
 
     private:
-        SharedRef& m_parent;
+        SharedRefBase& m_parent;
     };
 
     struct RefBlock {
-        uint32_t strong = 0; // strong use-count for m_ptr lifetime
-        uint32_t weak = 0;   // weak ref-count for SharedRef lifetime
+        uint32_t strong = 0; // strong use-count for m_inner lifetime
+        uint32_t weak = 0;   // weak ref-count for SharedRefBase lifetime
     };
     /** Thread-safe handling of strong & weak reference-counts. */
     struct AtomicRefBlock {
@@ -159,14 +139,72 @@ private:
             }
         }
 
-    private:
-        std::atomic<uint32_t> strong = 0; // strong ref-count for m_ptr lifetime
-        std::atomic<uint32_t> weak = 0;   // weak ref-count for SharedRef lifetime
+    protected:
+        std::atomic<uint32_t> strong = 0; // strong ref-count for m_inner lifetime
+        std::atomic<uint32_t> weak = 0;   // weak ref-count for SharedRefBase lifetime
     };
 
+    /** Get or set pointer to inner object. */
+    virtual IUnknown* Inner() = 0;
+    virtual void     ClearInner() = 0;
+
     AtomicRefBlock        m_refs; // Reference-counts. Only touched once per method for thread safety.
-    CComAggObject<Class>* m_ptr = nullptr;
     WeakRef               m_weak;
-    ULONGLONG             m_owner = 0; // Opaque owning object identifier. Shall NOT be dereferenced.
     static inline ULONG   s_obj_count = 0;
+};
+
+
+/** Create a weak-pointer compatible aggregated COM object from a C++ COM class. */
+template <class Class>
+class SharedRef : public SharedRefBase {
+public:
+    SharedRef() {
+        CComAggObject<Class>::CreateInstance(this, &m_inner);
+        assert(m_inner);
+        m_inner->AddRef(); // doesn't increase ref-count for this
+    }
+    ~SharedRef() override {
+        assert(m_inner == nullptr);
+    }
+
+    /** Pointer to internal C++ class. Potentially unsafe. Only call immediately after construction. */
+    Class* Internal() const {
+        assert(m_inner);
+        return &m_inner->m_contained;
+    }
+
+private:
+    IUnknown* Inner() override {
+        return m_inner;
+    }
+    void ClearInner() override {
+        m_inner = nullptr;
+    }
+
+    CComAggObject<Class>* m_inner = nullptr;
+};
+
+
+/** Create a weak-pointer compatible aggregated COM object based on ClassID. */
+class SharedRefClsid : public SharedRefBase {
+public:
+    SharedRefClsid(GUID clsid, DWORD context = CLSCTX_ALL) {
+        CComPtr<IUnknown> inner;
+        CHECK(inner.CoCreateInstance(clsid, this, context));
+        m_inner = inner.Detach();
+        assert(m_inner);
+    }
+    ~SharedRefClsid() override {
+        assert(m_inner == nullptr);
+    }
+
+private:
+    IUnknown* Inner() override {
+        return m_inner;
+    }
+    void ClearInner() override {
+        m_inner = nullptr;
+    }
+
+    IUnknown* m_inner = nullptr;
 };
