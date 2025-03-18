@@ -29,7 +29,7 @@ def ExtractComments (source, comments):
         return hash
 
     # pattern that detects multi-line "/*...*/" strings non-greedy
-    pattern = re.compile('/\*.*?\*/', re.DOTALL)
+    pattern = re.compile('/\\*.*?\\*/', re.DOTALL)
     source = pattern.sub(ReplaceFun, source)
 
     # pattern that detects "//..." strings
@@ -108,7 +108,7 @@ def ParseAttributes (source):
         return result
 
     # pattern to match multi-line '[...]' attributes non-greedy
-    pattern = re.compile('\[.*?\]', re.DOTALL)
+    pattern = re.compile('\\[.*?\\]', re.DOTALL)
     modified = pattern.sub(ReplaceFun, source)
     return modified, interfaces
 
@@ -128,7 +128,7 @@ def ParseInterfaces (source):
             return substr.replace(':', ': public', 1)
 
     # pattern to match 'interface ABC : IUnknown {'
-    pattern = re.compile('interface\s*[a-zA-Z0-9_]+?\s*:\s*[a-zA-Z0-9_]+\s*{')
+    pattern = re.compile('interface\\s*[a-zA-Z0-9_]+?\\s*:\\s*[a-zA-Z0-9_]+\\s*{')
     source = pattern.sub(ReplaceFun1, source)
 
     def ReplaceFun2 (match):
@@ -141,12 +141,12 @@ def ParseInterfaces (source):
         return substr
 
     # pattern to match 'HRESULT Fun (....);' method signatures
-    pattern2 = re.compile('HRESULT \s*[a-zA-Z0-9_]+?\s*\(.*?\)\s*;')
+    pattern2 = re.compile('HRESULT \\s*[a-zA-Z0-9_]+?\\s*\\(.*?\\)\\s*;')
     source = pattern2.sub(ReplaceFun2, source)
             
     # pattern to match 'coclass ABC {...};'
-    interface_signature = '(\[default\])?\s+interface\s+[a-zA-Z0-9_]+;'
-    pattern = re.compile('coclass\s*[a-zA-Z0-9_]+?\s*{(\s*'+interface_signature+')*\s*};')
+    interface_signature = '(\\[default\\])?\\s+interface\\s+[a-zA-Z0-9_]+;'
+    pattern = re.compile('coclass\\s*[a-zA-Z0-9_]+?\\s*{(\\s*'+interface_signature+')*\\s*};')
     source = pattern.sub('', source) # remove matches
     
     def ReplaceFun3 (match):
@@ -157,7 +157,7 @@ def ParseInterfaces (source):
     
     # pattern to match 'interface ABC;' (forward declarations)
     # note that this MUST be done after processing the 'coclass' definitions, since they contain interface listings
-    pattern = re.compile('interface\s*[a-zA-Z0-9_]+?\s*;')
+    pattern = re.compile('interface\\s*[a-zA-Z0-9_]+?\\s*;')
     source = pattern.sub(ReplaceFun3, source)
     
     return source
@@ -173,7 +173,7 @@ def ParseCppQuote (source):
         return substr[11:-2]
 
     # pattern to match 'cpp_quote("...")'
-    pattern = re.compile('cpp_quote\(".*"\)')
+    pattern = re.compile('cpp_quote\\(".*"\\)')
     source = pattern.sub(ReplaceFun, source)
     return source
 
@@ -192,7 +192,7 @@ def ParseSafeArray (source):
             return 'SAFEARRAY *'
 
     # pattern to match 'SAFEARRAY(byte)' and similar
-    pattern = re.compile('SAFEARRAY\([a-zA-Z0-9_\s\*]+?\)') # matches a-z, A-Z, '_' & '*'
+    pattern = re.compile('SAFEARRAY\\([a-zA-Z0-9_\\s\\*]+?\\)') # matches a-z, A-Z, '_' & '*'
     # convert to SAFEARRAY pointer
     source = pattern.sub(ReplaceFun, source)
     return source
@@ -216,14 +216,14 @@ def ParseImport (source):
         # change 'import "abc.idl";' to '#include "abc.h"'
         return '#include "'+filename[:filename.rfind('.')]+'.h"'
     
-    pattern = re.compile('import \s*"[a-zA-Z0-9_\.]+?"\s*;')
+    pattern = re.compile('import \\s*"[a-zA-Z0-9_\\.]+?"\\s*;')
     source = pattern.sub(ReplaceFun, source)
     
     def RemoveFun (match):
         return ''
     
     # remove 'importlib("...");'
-    pattern = re.compile('importlib\("[a-zA-Z0-9_\.]+?"\);')
+    pattern = re.compile('importlib\\("[a-zA-Z0-9_\\.]+?"\\);')
     source = pattern.sub(RemoveFun, source)
     
     def RemoveLibFun (match):
@@ -232,7 +232,7 @@ def ParseImport (source):
         return ''
     
     # remove 'library XXX {'
-    pattern = re.compile('library [a-zA-Z0-9_\.]+\s*{')
+    pattern = re.compile('library [a-zA-Z0-9_\\.]+\\s*{')
     source = pattern.sub(RemoveLibFun, source)
     
     if found_lib:
