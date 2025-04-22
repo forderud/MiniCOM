@@ -12,7 +12,6 @@
     Casting back to IUnknown and other interfaces only succeed if the object is still alive. */
 struct DECLSPEC_UUID("146532F9-763D-44C9-875A-7B5B732B9046")
 IWeakRef : public IUnknown {
-    virtual HRESULT GetOwner(ULONGLONG* owner) = 0; 
 };
 
 /** COM wrapper class that provides support for weak references through the IWeakRef interface. */
