@@ -708,6 +708,12 @@ public:
         return m_ptr;
     }
 
+    bool operator==(T* p) const {
+        if (m_ptr == p)
+            return true;
+        return CompareUnknown(p) == 0;
+    }
+
     HRESULT CreateInstance (const GUID& clsid, IUnknown* outer = nullptr, DWORD context = CLSCTX_ALL) noexcept {
         (void)context;
 
@@ -752,6 +758,29 @@ private:
         T* tmp = m_ptr;
         m_ptr = other.m_ptr;
         other.m_ptr = tmp;
+    }
+
+    ptrdiff_t CompareUnknown(T * p) const {
+        static_assert(std::is_base_of<IUnknown, T>::value, "_com_ptr_t::CompareUnknown: T must inherit from IUnknown");
+
+        IUnknown* pu1 = nullptr;
+        IUnknown* pu2 = nullptr;
+
+        if (m_ptr) {
+            HRESULT hr = m_ptr->QueryInterface(__uuidof(IUnknown), reinterpret_cast<void**>(&pu1));
+            (void)hr;
+            assert(SUCCEEDED(hr) && "_com_ptr_t::CompareUnknown cast failed");
+            pu1->Release();
+        }
+
+        if (p) {
+            HRESULT hr = p->QueryInterface(__uuidof(IUnknown), reinterpret_cast<void**>(&pu2));
+            (void)hr;
+            assert(SUCCEEDED(hr) && "_com_ptr_t::CompareUnknown cast failed");
+            pu2->Release();
+        }
+
+        return (pu1 - pu2);
     }
 };
 
