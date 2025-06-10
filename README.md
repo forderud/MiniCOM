@@ -1,6 +1,18 @@
 Partial cross-platform implementation of the [Component Object Model (COM)](https://docs.microsoft.com/en-us/windows/win32/com/the-component-object-model) runtime and [Active Template Library (ATL)](https://docs.microsoft.com/en-us/cpp/atl/atl-com-desktop-components).
 
-Designed as a compatibility library to enable building of existing COM/ATL classes with clang or gcc for for Linux, Mac and mobile platforms. Developed due to lack of knowledge of any better alternatives.
+### Platform Support
+Designed as a compatibility library to enable building of existing COM/ATL classes also on non-Windows platforms.
+
+The following platforms are currently supported:
+* Linunx
+* MacOS
+* Android
+* iOS
+* WebAssembly with Emscripten compiler
+
+Both the gcc and clang compilers are supported.
+
+There's no point in supporting Windows, since the same functionality is already inbuilt there.
 
 ### Design goals
 * Support simple COM classes implemented in ATL.
