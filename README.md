@@ -8,9 +8,9 @@ The following operating systems are currently supported:
 * MacOS
 * Android
 * iOS
-* WebAssembly with Emscripten compiler
+* WebAssembly with [Emscripten](https://emscripten.org/) compiler
 
-Both the gcc and clang compilers are supported.
+Both the [gcc](https://gcc.gnu.org/) and [clang](https://clang.llvm.org/) compilers are supported.
 
 There's no point in supporting Windows, since the same functionality is already inbuilt there.
 
