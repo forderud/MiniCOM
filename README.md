@@ -3,7 +3,7 @@ Partial cross-platform implementation of the [Component Object Model (COM)](http
 ### Platform Support
 Designed as a compatibility library to enable building of existing COM/ATL classes also on non-Windows platforms.
 
-The following platforms are currently supported:
+The following operating systems are currently supported:
 * Linunx
 * MacOS
 * Android
