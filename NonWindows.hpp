@@ -358,7 +358,12 @@ public:
 };
 static_assert(sizeof(CComBSTR) == sizeof(wchar_t*), "CComBSTR size mismatch");
 
+template<typename T>
+class CComPtr;
 } // namespace ATL
+
+template<typename T>
+class _com_ptr_t;
 
 extern "C" {
 // REF: https://msdn.microsoft.com/en-us/library/windows/desktop/ms682521.aspx
@@ -484,7 +489,12 @@ private:
 
 /** Internal class that SHALL ONLY be accessed through _com_ptr_t<T> or CComPtr<T> to preserve Windows compatibility. */
 class IUnknownFactory {
-public:
+    template<typename T>
+    friend class _com_ptr_t;
+    template<typename T>
+    friend class ATL::CComPtr;
+
+private:
     typedef HRESULT(*Factory)(IUnknown*, IUnknown**);
 
     /** Create COM class based on "[<Program>.]<Component>[.<Version>]" ProgID string. */
@@ -547,6 +557,7 @@ public:
         return nullptr;
     }
     
+public:
     template <class CLS>
     static const char* RegisterClass(GUID clsid, const char * class_name) {
 
