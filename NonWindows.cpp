@@ -2,8 +2,8 @@
 
 
 __attribute__((visibility("default")))
-std::map<std::pair<GUID,std::string>, IUnknownFactory::Factory> & IUnknownFactory::Factories () {
-    static std::map<std::pair<GUID,std::string>, Factory> s_factory;
+std::map<std::pair<GUID,ATL::CComBSTR>, IUnknownFactory::Factory> & IUnknownFactory::Factories () {
+    static std::map<std::pair<GUID,CComBSTR>, Factory> s_factory;
     return s_factory;
 }
 

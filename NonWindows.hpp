@@ -482,24 +482,25 @@ private:
     std::atomic<ULONG>        m_ref {0};
 };
 
+/** Internal class that SHALL ONLY be accessed through _com_ptr_t<T> or CComPtr<T> to preserve Windows compatibility. */
 class IUnknownFactory {
 public:
     typedef HRESULT(*Factory)(IUnknown*, IUnknown**);
 
     /** Create COM class based on "[<Program>.]<Component>[.<Version>]" ProgID string. */
-    static IUnknown* CreateInstance (std::string class_name, IUnknown* outer) {
+    static IUnknown* CreateInstance (std::wstring class_name, IUnknown* outer) {
         // remove "<Program>." prefix and ".<Version>" suffix if present
-        size_t idx1 = class_name.find('.');
-        if (idx1 != std::string::npos) {
-            std::string suffix = class_name.substr(idx1+1); // "<Component>.<Version>" or "<Version>"
-            size_t idx2 = suffix.find('.');
+        size_t idx1 = class_name.find(L'.');
+        if (idx1 != std::wstring::npos) {
+            std::wstring suffix = class_name.substr(idx1+1); // "<Component>.<Version>" or "<Version>"
+            size_t idx2 = suffix.find(L'.');
 
-            if (idx2 != std::string::npos) {
+            if (idx2 != std::wstring::npos) {
                 // input contain two '.'s, keep center part
                 class_name = suffix.substr(0,idx2); // "<Component>"
             } else {
                 // input contain one '.'. check if suffix is a number
-                auto version = strtol(suffix.c_str(), nullptr, /*base*/10);
+                auto version = wcstol(suffix.c_str(), nullptr, /*base*/10);
                 if (version != 0) {
                     class_name = class_name.substr(0, idx1);
                 } else {
@@ -509,7 +510,7 @@ public:
         }
 
         for (const auto & elm : Factories()) {
-            if (elm.first.second == class_name) {
+            if (elm.first.second == ATL::CComBSTR(class_name.c_str())) {
                 IUnknown* obj = nullptr;
                 HRESULT hr = elm.second(outer, &obj);
                 assert(hr == S_OK);
@@ -518,7 +519,7 @@ public:
             }
         }
 
-        std::cerr << "CoCreateInstance error: Unknown class " << class_name << std::endl;
+        std::wcerr << L"CoCreateInstance error: Unknown class " << class_name << std::endl;
         assert(false);
         return nullptr;
     }
@@ -548,8 +549,12 @@ public:
     
     template <class CLS>
     static const char* RegisterClass(GUID clsid, const char * class_name) {
+
+        std::wstring w_class_name(strlen(class_name), L'\0');
+        mbstowcs(const_cast<wchar_t*>(w_class_name.data()), class_name, w_class_name.size());
+
         //printf("IUnknownFactory::RegisterClass(%s)\n", class_name);
-        Factories()[{clsid,class_name}] = CreateClass<CLS>;
+        Factories()[{clsid,w_class_name.c_str()}] = CreateClass<CLS>;
         return class_name; // pass-through name
     }
 
@@ -579,7 +584,7 @@ private:
         }
     }
 
-    static std::map<std::pair<GUID,std::string>, Factory> & Factories ();
+    static std::map<std::pair<GUID,ATL::CComBSTR>, Factory> & Factories ();
 };
 
 #define OBJECT_ENTRY_AUTO(clsid, cls) \
@@ -735,11 +740,7 @@ public:
         if (!name)
             return E_INVALIDARG;
 
-        // convert name to ASCII
-        std::string a_name(wcslen(name), '\0');
-        wcstombs(const_cast<char*>(a_name.data()), name, a_name.size());
-
-        _com_ptr_t<IUnknown> tmp1(IUnknownFactory::CreateInstance(a_name, outer));
+        _com_ptr_t<IUnknown> tmp1(IUnknownFactory::CreateInstance(name, outer));
         if (!tmp1)
             return E_FAIL;
 
@@ -871,11 +872,7 @@ public:
     HRESULT CoCreateInstance (std::wstring name, IUnknown* outer = NULL, DWORD context = CLSCTX_ALL) {
         (void)context;
 
-        // convert name to ASCII
-        std::string a_name(name.size(), '\0');
-        wcstombs(const_cast<char*>(a_name.data()), name.c_str(), a_name.size());
-
-        CComPtr<IUnknown> tmp1(IUnknownFactory::CreateInstance(a_name, outer));
+        CComPtr<IUnknown> tmp1(IUnknownFactory::CreateInstance(name, outer));
         if (!tmp1)
             return E_FAIL;
 
