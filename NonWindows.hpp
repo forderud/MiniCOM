@@ -61,7 +61,7 @@ static_assert(sizeof(int) == 4, "int size not 32bit");
 #define __int64       long long ///< 64bit int (cannot use typedef due to "unsigned __int64" code)
 
 // Common HRESULT codes
-// REF: https://msdn.microsoft.com/en-us/library/windows/desktop/aa378137.aspx
+// REF: https://learn.microsoft.com/en-us/windows/win32/seccrypto/common-hresult-values
 #define S_OK           static_cast<int32_t>(0L)
 #define S_FALSE        static_cast<int32_t>(1L)
 #define E_BOUNDS       static_cast<int32_t>(0x8000000BL)
@@ -366,7 +366,7 @@ template<typename T>
 class _com_ptr_t;
 
 extern "C" {
-// REF: https://msdn.microsoft.com/en-us/library/windows/desktop/ms682521.aspx
+// interface ID values for well-known interfaces
 static constexpr GUID IID_IUnknown       = {0x00000000,0x0000,0x0000,{0xC0,0x00,0x00,0x00,0x00,0x00,0x00,0x46}};
 static constexpr GUID IID_IMessageFilter = {0x00000016,0x0000,0x0000,{0xC0,0x00,0x00,0x00,0x00,0x00,0x00,0x46}};
 
