@@ -953,20 +953,21 @@ using CComQIPtr = CComPtr<T>;
 
 } // namespace ATL
 
+/** Internal class that SHALL ONLY be accessed through CComSafeArray<T> to preserve Windows compatibility. */
 struct SAFEARRAY {
-    /** std::vector variant that also support non-owning pointers. */
+    /** std::vector alternative for plain old data (POD) types. */
     template <class T>
     class Buffer {
         public:
             Buffer(size_t size = 0) : m_size(size) {
                 if (size > 0) {
-                    m_ptr = new T[size];
+                    m_ptr = (T*)malloc(sizeof(T)*size);
                     m_owning = true;
                 }
             }
             Buffer(const Buffer& other, bool deep_copy) : m_size(other.m_size) {
                 if (deep_copy) {
-                    m_ptr = new T[m_size];
+                    m_ptr = (T*)malloc(sizeof(T)*m_size);
                     m_owning = true;
                     memcpy(m_ptr, other.m_ptr, m_size);
                 } else {
@@ -977,7 +978,7 @@ struct SAFEARRAY {
 
             ~Buffer() {
                 if (m_ptr && m_owning)
-                    delete[] m_ptr;
+                    free(m_ptr);
                 m_ptr = nullptr;
             }
 
@@ -1002,7 +1003,7 @@ struct SAFEARRAY {
                 // allocate new buffer
                 T * new_ptr = nullptr;
                 if (size > 0) {
-                    new_ptr = new T[size];
+                    new_ptr = (T*)malloc(sizeof(T)*size);
                     m_owning = true;
                     memcpy(new_ptr, m_ptr, std::min(m_size, size));
                     for (size_t i = std::min(m_size, size); i < size; ++i)
@@ -1010,7 +1011,7 @@ struct SAFEARRAY {
                 }
                 // delete old buffer
                 if (m_ptr && m_owning)
-                    delete[] m_ptr;
+                    free(m_ptr);
                 // commit changes
                 m_ptr = new_ptr;
                 m_size = size;
