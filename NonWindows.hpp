@@ -959,10 +959,16 @@ protected:
 template <class T>
 using CComQIPtr = CComPtr<T>;
 
+template <class T>
+struct CComSafeArray;
+
 } // namespace ATL
 
 /** Internal class that SHALL ONLY be accessed through CComSafeArray<T> to preserve Windows compatibility. */
 struct SAFEARRAY {
+    template<typename T>
+    friend struct ATL::CComSafeArray;
+
     /** std::vector alternative for plain old data (POD) types. */
     template <class T>
     class Buffer {
@@ -1058,9 +1064,11 @@ struct SAFEARRAY {
     SAFEARRAY& operator = (const SAFEARRAY&) = delete;
 
     const TYPE                          type = TYPE_EMPTY; ///< \todo: Replace with std::variant when upgrading to C++17
-    Buffer<unsigned char>               data;
+    Buffer<unsigned char>               data;              ///< \todo: Also make private
+private:
     std::vector<ATL::CComBSTR>          strings;
     std::vector<ATL::CComPtr<IUnknown>> pointers;
+public:
     const unsigned int                  elm_size = 0;
 };
 
