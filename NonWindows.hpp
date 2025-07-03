@@ -733,7 +733,7 @@ public:
     HRESULT CreateInstance (const GUID& clsid, IUnknown* outer = nullptr, DWORD context = CLSCTX_ALL) noexcept {
         (void)context;
 
-        _com_ptr_t<IUnknown> tmp1(IUnknownFactory::CreateInstance(clsid, outer));
+        _com_ptr_t<IUnknown> tmp1(IUnknownFactory::CreateInstance(clsid, outer), /*addref*/false);
         if (!tmp1)
             return E_FAIL;
 
@@ -751,7 +751,7 @@ public:
         if (!name)
             return E_INVALIDARG;
 
-        _com_ptr_t<IUnknown> tmp1(IUnknownFactory::CreateInstance(name, outer));
+        _com_ptr_t<IUnknown> tmp1(IUnknownFactory::CreateInstance(name, outer), /*addref*/false);
         if (!tmp1)
             return E_FAIL;
 
@@ -883,9 +883,12 @@ public:
     HRESULT CoCreateInstance (std::wstring name, IUnknown* outer = NULL, DWORD context = CLSCTX_ALL) {
         (void)context;
 
-        CComPtr<IUnknown> tmp1(IUnknownFactory::CreateInstance(name, outer));
-        if (!tmp1)
+        IUnknown* tmp0 = IUnknownFactory::CreateInstance(name, outer); // RefCount=1
+        if (!tmp0)
             return E_FAIL;
+
+        CComPtr<IUnknown> tmp1;
+        tmp1.Attach(tmp0);
 
         CComPtr tmp2;
         tmp2 = tmp1; // cast
@@ -898,10 +901,12 @@ public:
 
     HRESULT CoCreateInstance (GUID clsid, IUnknown* outer = NULL, DWORD context = CLSCTX_ALL) {
         (void)context;
-
-        CComPtr<IUnknown> tmp1(IUnknownFactory::CreateInstance(clsid, outer));
-        if (!tmp1)
+        IUnknown* tmp0 = IUnknownFactory::CreateInstance(clsid, outer); // RefCount=1
+        if (!tmp0)
             return E_FAIL;
+
+        CComPtr<IUnknown> tmp1;
+        tmp1.Attach(tmp0);
 
         CComPtr tmp2;
         tmp2 = tmp1; // cast
