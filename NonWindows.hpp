@@ -971,9 +971,12 @@ struct CComSafeArray;
 
 /** Internal class that SHALL ONLY be accessed through CComSafeArray<T> to preserve Windows compatibility. */
 struct SAFEARRAY {
+    friend struct std::default_delete<SAFEARRAY>; // used by std::unique_ptr
+    friend class std::unique_ptr<SAFEARRAY>;
     template<typename T>
     friend struct ATL::CComSafeArray;
 
+private:
     /** std::vector alternative for plain old data (POD) types. */
     template <class T>
     class Buffer {
@@ -1069,11 +1072,9 @@ struct SAFEARRAY {
     SAFEARRAY& operator = (const SAFEARRAY&) = delete;
 
     const TYPE                          type = TYPE_EMPTY; ///< \todo: Replace with std::variant when upgrading to C++17
-    Buffer<unsigned char>               data;              ///< \todo: Also make private
-private:
+    Buffer<unsigned char>               data;
     std::vector<ATL::CComBSTR>          strings;
     std::vector<ATL::CComPtr<IUnknown>> pointers;
-public:
     const unsigned int                  elm_size = 0;
 };
 
@@ -1175,6 +1176,29 @@ struct CComSafeArray {
         assert(m_ptr);
         assert(m_ptr->type == SAFEARRAY::TYPE_DATA);
         return static_cast<unsigned int>(m_ptr->data.size()/m_ptr->elm_size);
+    }
+    
+    /** Internal function. Do NOT call unless you know what you're doing. */
+    static typename CComTypeWrapper<T>::type* InternalDataPointer(SAFEARRAY* obj) {
+        CComSafeArray<T> sa;
+        sa.Attach(obj);
+        typename CComTypeWrapper<T>::type* ptr = &sa.GetAt(0);
+        sa.Detach();
+        return ptr;
+    }
+
+    /** Internal function. Do NOT call unless you know what you're doing. */
+    static unsigned int InternalElementCount(SAFEARRAY* obj) {
+        CComSafeArray<T> sa;
+        sa.Attach(obj);
+        unsigned int count = sa.GetCount();
+        sa.Detach();
+        return count;
+    }
+    
+    /** Internal function. Do NOT call unless you know what you're doing. */
+    static SAFEARRAY* InternalShallowCopy(const SAFEARRAY& obj) {
+        return new SAFEARRAY(obj, /*deep copy*/false);
     }
 
     std::unique_ptr<SAFEARRAY> m_ptr;
