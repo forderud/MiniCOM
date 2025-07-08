@@ -10,12 +10,12 @@ std::map<std::pair<GUID,ATL::CComBSTR>, IUnknownFactory::Factory> & IUnknownFact
 
 template <> __attribute__((visibility("default")))
 ATL::CComSafeArray<BSTR>::CComSafeArray (UINT size) {
-    m_ptr.reset(new SAFEARRAY(SAFEARRAY::TYPE_STRINGS));
+    m_ptr = SAFEARRAY::Create(SAFEARRAY::TYPE_STRINGS);
     m_ptr->strings.resize(size);
 }
 template <> __attribute__((visibility("default")))
 ATL::CComSafeArray<IUnknown*>::CComSafeArray (UINT size) {
-    m_ptr.reset(new SAFEARRAY(SAFEARRAY::TYPE_POINTERS));
+    m_ptr = SAFEARRAY::Create(SAFEARRAY::TYPE_POINTERS);
     m_ptr->pointers.resize(size);
 }
 
@@ -37,10 +37,11 @@ HRESULT ATL::CComSafeArray<BSTR>::Add (const typename CComTypeWrapper<BSTR>::typ
     (void)copy; // mute unreferenced argument warning
 
     if (!m_ptr)
-        m_ptr.reset(new SAFEARRAY(SAFEARRAY::TYPE_STRINGS)); // lazy initialization
+        m_ptr = SAFEARRAY::Create(SAFEARRAY::TYPE_STRINGS); // lazy initialization
 
     assert(m_ptr->type == SAFEARRAY::TYPE_STRINGS);
-    m_ptr->strings.push_back(t);
+    const size_t prev_size = m_ptr->strings.size();
+    m_ptr->strings.resize(prev_size + 1, t);
     return S_OK;
 }
 template <> __attribute__((visibility("default")))
@@ -48,10 +49,11 @@ HRESULT ATL::CComSafeArray<IUnknown*>::Add (const typename CComTypeWrapper<IUnkn
     (void)copy; // mute unreferenced argument warning
 
     if (!m_ptr)
-        m_ptr.reset(new SAFEARRAY(SAFEARRAY::TYPE_POINTERS)); // lazy initialization
+        m_ptr = SAFEARRAY::Create(SAFEARRAY::TYPE_POINTERS); // lazy initialization
 
     assert(m_ptr->type == SAFEARRAY::TYPE_POINTERS);
-    m_ptr->pointers.push_back(t);
+    const size_t prev_size = m_ptr->pointers.size();
+    m_ptr->pointers.resize(prev_size + 1, t);
     return S_OK;
 }
 

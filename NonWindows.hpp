@@ -7,10 +7,8 @@
 
 #define DECLSPEC_UUID(arg) 
 
-#include <memory>
 #include <cassert>
 #include <atomic>
-#include <vector>
 #include <string>
 #include <string.h> // for wcsdup
 #include <codecvt>
@@ -971,27 +969,27 @@ struct CComSafeArray;
 
 /** Internal class that SHALL ONLY be accessed through CComSafeArray<T> to preserve Windows compatibility. */
 struct SAFEARRAY {
-    friend struct std::default_delete<SAFEARRAY>; // used by std::unique_ptr
-    friend class std::unique_ptr<SAFEARRAY>;
     template<typename T>
     friend struct ATL::CComSafeArray;
 
 private:
-    /** std::vector alternative for plain old data (POD) types. */
+    /** std::vector alternative to avoid C++ standard library dependency. */
     template <class T>
     class Buffer {
         public:
             Buffer(size_t size = 0) : m_size(size) {
                 if (size > 0) {
-                    m_ptr = (T*)malloc(sizeof(T)*size);
+                    m_ptr = Allocate(size);
                     m_owning = true;
                 }
             }
             Buffer(const Buffer& other, bool deep_copy) : m_size(other.m_size) {
                 if (deep_copy) {
-                    m_ptr = (T*)malloc(sizeof(T)*m_size);
+                    m_ptr = Allocate(m_size);
                     m_owning = true;
-                    memcpy(m_ptr, other.m_ptr, m_size);
+
+                    for (size_t i = 0; i < m_size; i++)
+                        m_ptr[i] = other.m_ptr[i];
                 } else {
                     m_ptr = other.m_ptr;
                     m_owning = false;
@@ -1000,7 +998,7 @@ private:
 
             ~Buffer() {
                 if (m_ptr && m_owning)
-                    free(m_ptr);
+                    Free(m_ptr, m_size);
                 m_ptr = nullptr;
             }
 
@@ -1025,15 +1023,18 @@ private:
                 // allocate new buffer
                 T * new_ptr = nullptr;
                 if (size > 0) {
-                    new_ptr = (T*)malloc(sizeof(T)*size);
+                    new_ptr = Allocate(size);
                     m_owning = true;
-                    memcpy(new_ptr, m_ptr, std::min(m_size, size));
+
+                    for (size_t i = 0; i < std::min(m_size, size); ++i)
+                        new_ptr[i] = m_ptr[i];
+
                     for (size_t i = std::min(m_size, size); i < size; ++i)
                         new_ptr[i] = val;
                 }
                 // delete old buffer
                 if (m_ptr && m_owning)
-                    free(m_ptr);
+                    Free(m_ptr, m_size);
                 // commit changes
                 m_ptr = new_ptr;
                 m_size = size;
@@ -1045,6 +1046,20 @@ private:
             Buffer& operator = (Buffer&&) = delete;
 
         private:
+            static T* Allocate(size_t size) {
+                auto* ptr = (T*)malloc(sizeof(T)*size);
+                for (size_t i = 0; i < size; i++)
+                    new (&ptr[i]) T();
+
+                return ptr;
+            }
+            
+            static void Free (T* ptr, size_t size) {
+                for (size_t i = 0; i < size; i++)
+                    ptr[i].~T();
+                free(ptr);
+            }
+            
             size_t m_size = 0;
             T  *   m_ptr = nullptr;
             bool   m_owning = true;
@@ -1062,7 +1077,7 @@ private:
     }
     SAFEARRAY (unsigned int _elm_size, unsigned int count) : type(TYPE_DATA), data(_elm_size*count), elm_size(_elm_size) {
     }
-    SAFEARRAY(const SAFEARRAY& other, bool deep_copy = true) : type(other.type), data(other.data, deep_copy), strings(other.strings), pointers(other.pointers), elm_size(other.elm_size) {
+    SAFEARRAY(const SAFEARRAY& other, bool deep_copy) : type(other.type), data(other.data, deep_copy), strings(other.strings, deep_copy), pointers(other.pointers, deep_copy), elm_size(other.elm_size) {
     }
 
     ~SAFEARRAY() {
@@ -1070,12 +1085,33 @@ private:
 
     SAFEARRAY () = delete;
     SAFEARRAY& operator = (const SAFEARRAY&) = delete;
+    
+    static SAFEARRAY* Create(TYPE t) {
+        auto* ptr = (SAFEARRAY*)malloc(sizeof(SAFEARRAY));
+        new (ptr) SAFEARRAY(t);
+        return ptr;
+    }
+    static SAFEARRAY* Create(unsigned int _elm_size, unsigned int count) {
+        auto* ptr = (SAFEARRAY*)malloc(sizeof(SAFEARRAY));
+        new (ptr) SAFEARRAY(_elm_size, count);
+        return ptr;
+    }
+    static SAFEARRAY* Create(const SAFEARRAY& other, bool deep_copy = true) {
+        auto* ptr = (SAFEARRAY*)malloc(sizeof(SAFEARRAY));
+        new (ptr) SAFEARRAY(other, deep_copy);
+        return ptr;
+    }
+    
+    static void Destroy(SAFEARRAY* obj) {
+        obj->~SAFEARRAY();
+        free(obj);
+    }
 
-    const TYPE                          type = TYPE_EMPTY; ///< \todo: Replace with std::variant when upgrading to C++17
-    Buffer<unsigned char>               data;
-    std::vector<ATL::CComBSTR>          strings;
-    std::vector<ATL::CComPtr<IUnknown>> pointers;
-    const unsigned int                  elm_size = 0;
+    const TYPE                     type = TYPE_EMPTY; ///< \todo: Replace with std::variant when upgrading to C++17
+    Buffer<unsigned char>          data;
+    Buffer<ATL::CComBSTR>          strings;
+    Buffer<ATL::CComPtr<IUnknown>> pointers;
+    const unsigned int             elm_size = 0;
 };
 
 
@@ -1100,17 +1136,18 @@ struct CComSafeArray {
     }
 
     CComSafeArray (UINT size) {
-        m_ptr.reset(new SAFEARRAY(sizeof(T), size));
+        m_ptr = SAFEARRAY::Create(sizeof(T), size);
     }
 
     CComSafeArray (SAFEARRAY * obj) {
         if (obj) {
             assert(obj->elm_size == sizeof(T));
-            m_ptr.reset(new SAFEARRAY(*obj));
+            m_ptr = SAFEARRAY::Create(*obj);
         }
     }
 
     ~CComSafeArray () {
+        Destroy();
     }
 
     CComSafeArray (const CComSafeArray&) = delete;
@@ -1119,22 +1156,28 @@ struct CComSafeArray {
     CComSafeArray& operator = (CComSafeArray&&) = default;
 
     HRESULT Destroy() {
-        m_ptr.reset();
+        if (m_ptr) {
+            SAFEARRAY::Destroy(m_ptr);
+            m_ptr = nullptr;
+        }
         return S_OK;
     }
 
     HRESULT Attach (SAFEARRAY * obj) {
         assert(obj);
         assert(obj->elm_size == sizeof(T));
-        m_ptr.reset(obj);
+        Destroy();
+        m_ptr = obj;
         return S_OK;
     }
     SAFEARRAY* Detach () {
-        return m_ptr.release();
+        SAFEARRAY* tmp = m_ptr;
+        m_ptr = nullptr;
+        return tmp;
     }
 
     operator SAFEARRAY* () {
-        return m_ptr.get();
+        return m_ptr;
     }
 
     typename CComTypeWrapper<T>::type& GetAt (int idx) const {
@@ -1162,7 +1205,7 @@ struct CComSafeArray {
         (void)copy; // mute unreferenced argument warning
         
         if (!m_ptr)
-            m_ptr.reset(new SAFEARRAY(sizeof(T), 0)); // lazy initialization
+            m_ptr = SAFEARRAY::Create(sizeof(T), 0); // lazy initialization
 
         assert(m_ptr->type == SAFEARRAY::TYPE_DATA);
         assert(sizeof(T) == m_ptr->elm_size);
@@ -1198,10 +1241,10 @@ struct CComSafeArray {
     
     /** Internal function. Do NOT call unless you know what you're doing. */
     static SAFEARRAY* InternalShallowCopy(const SAFEARRAY& obj) {
-        return new SAFEARRAY(obj, /*deep copy*/false);
+        return SAFEARRAY::Create(obj, /*deep copy*/false);
     }
 
-    std::unique_ptr<SAFEARRAY> m_ptr;
+    SAFEARRAY* m_ptr = nullptr;
 };
 // Template specializations. Implemented in cpp file.
 template <> CComSafeArray<BSTR>::CComSafeArray (UINT size);
