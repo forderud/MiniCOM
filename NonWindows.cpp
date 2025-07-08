@@ -2,8 +2,8 @@
 
 
 __attribute__((visibility("default")))
-std::map<std::pair<GUID,ATL::CComBSTR>, IUnknownFactory::Factory> & IUnknownFactory::Factories () {
-    static std::map<std::pair<GUID,CComBSTR>, Factory> s_factory;
+Buffer<IUnknownFactory::Entry> & IUnknownFactory::Factories () {
+    static Buffer<Entry> s_factory;
     return s_factory;
 }
 

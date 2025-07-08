@@ -1,5 +1,7 @@
 #pragma once
-/* Minimal subset of COM defines for compatibility with non-Windows platforms. */
+/* Minimal subset of COM defines for compatibility with non-Windows platforms.
+   Does deliberately NOT expose any C++ standard library types through its API
+   to decouple C++ standard library usage in client vs. server. */
 
 #ifdef _WIN32
 #error Header not intended for Windows platform
@@ -13,7 +15,6 @@
 #include <string.h> // for wcsdup
 #include <codecvt>
 #include <locale>
-#include <map>
 #include <iostream>
 #include <type_traits>
 
@@ -485,6 +486,100 @@ private:
     std::atomic<ULONG>        m_ref {0};
 };
 
+
+/** std::vector alternative to avoid C++ standard library dependency. */
+template <class T>
+class Buffer {
+public:
+    Buffer(size_t size = 0) : m_size(size) {
+        if (size > 0) {
+            m_ptr = Allocate(size);
+            m_owning = true;
+        }
+    }
+    Buffer(const Buffer& other, bool deep_copy) : m_size(other.m_size) {
+        if (deep_copy) {
+            m_ptr = Allocate(m_size);
+            m_owning = true;
+
+            for (size_t i = 0; i < m_size; i++)
+                m_ptr[i] = other.m_ptr[i];
+        } else {
+            m_ptr = other.m_ptr;
+            m_owning = false;
+        }
+    }
+
+    ~Buffer() {
+        if (m_ptr && m_owning)
+            Free(m_ptr, m_size);
+        m_ptr = nullptr;
+    }
+
+    size_t size() const {
+        return m_size;
+    }
+
+    T * data() {
+        return m_ptr;
+    }
+
+    T& operator [](size_t idx) {
+        return m_ptr[idx];
+    }
+    const T& operator [](size_t idx) const {
+        return m_ptr[idx];
+    }
+
+    void resize (size_t size, T val = T()) noexcept {
+        assert(m_owning);
+
+        // allocate new buffer
+        T * new_ptr = nullptr;
+        if (size > 0) {
+            new_ptr = Allocate(size);
+            m_owning = true;
+
+            for (size_t i = 0; i < std::min(m_size, size); ++i)
+                new_ptr[i] = m_ptr[i];
+
+            for (size_t i = std::min(m_size, size); i < size; ++i)
+                new_ptr[i] = val;
+        }
+        // delete old buffer
+        if (m_ptr && m_owning)
+            Free(m_ptr, m_size);
+        // commit changes
+        m_ptr = new_ptr;
+        m_size = size;
+    }
+
+    Buffer(const Buffer& other) = delete;
+    Buffer(Buffer&&) = delete;
+    Buffer& operator = (const Buffer&) = delete;
+    Buffer& operator = (Buffer&&) = delete;
+
+private:
+    static T* Allocate(size_t size) {
+        auto* ptr = (T*)malloc(sizeof(T)*size);
+        for (size_t i = 0; i < size; i++)
+            new (&ptr[i]) T();
+
+        return ptr;
+    }
+    
+    static void Free (T* ptr, size_t size) {
+        for (size_t i = 0; i < size; i++)
+            ptr[i].~T();
+        free(ptr);
+    }
+    
+    size_t m_size = 0;
+    T  *   m_ptr = nullptr;
+    bool   m_owning = true;
+};
+
+
 /** Internal class that SHALL ONLY be accessed through _com_ptr_t<T> or CComPtr<T> to preserve Windows compatibility. */
 class IUnknownFactory {
     template<typename T>
@@ -494,6 +589,12 @@ class IUnknownFactory {
 
 private:
     typedef HRESULT(*Factory)(IUnknown*, IUnknown**);
+    
+    struct Entry {
+        GUID          clsid{};
+        ATL::CComBSTR name;
+        Factory       factory = nullptr;
+    };
 
     /** Create COM class based on "[<Program>.]<Component>[.<Version>]" ProgID string. */
     static IUnknown* CreateInstance (std::wstring class_name, IUnknown* outer) {
@@ -517,10 +618,11 @@ private:
             }
         }
 
-        for (const auto & elm : Factories()) {
-            if (elm.first.second == ATL::CComBSTR(class_name.c_str())) {
+        for (size_t i = 0; i < Factories().size(); i++) {
+            const auto & elm = Factories()[i];
+            if (elm.name == ATL::CComBSTR(class_name.c_str())) {
                 IUnknown* obj = nullptr;
-                HRESULT hr = elm.second(outer, &obj);
+                HRESULT hr = elm.factory(outer, &obj);
                 assert(hr == S_OK);
                 if (SUCCEEDED(hr))
                     return obj;
@@ -534,10 +636,11 @@ private:
 
     /** Create COM class based on CLSID. */
     static IUnknown* CreateInstance (GUID clsid, IUnknown* outer) {
-        for (const auto & elm : Factories()) {
-            if (elm.first.first == clsid) {
+        for (size_t i = 0; i < Factories().size(); i++) {
+            const auto & elm = Factories()[i];
+            if (elm.clsid == clsid) {
                 IUnknown* obj = nullptr;
-                HRESULT hr = elm.second(outer, &obj);
+                HRESULT hr = elm.factory(outer, &obj);
                 assert(hr == S_OK);
                 if (SUCCEEDED(hr))
                     return obj;
@@ -563,7 +666,8 @@ public:
         mbstowcs(const_cast<wchar_t*>(w_class_name.data()), class_name, w_class_name.size());
 
         //printf("IUnknownFactory::RegisterClass(%s)\n", class_name);
-        Factories()[{clsid,w_class_name.c_str()}] = CreateClass<CLS>;
+        size_t prev_size = Factories().size();
+        Factories().resize(prev_size + 1, {clsid, w_class_name.c_str(), CreateClass<CLS>});
         return class_name; // pass-through name
     }
 
@@ -593,7 +697,7 @@ private:
         }
     }
 
-    static std::map<std::pair<GUID,ATL::CComBSTR>, Factory> & Factories ();
+    static Buffer<Entry> & Factories ();
 };
 
 #define OBJECT_ENTRY_AUTO(clsid, cls) \
@@ -973,98 +1077,6 @@ struct SAFEARRAY {
     friend struct ATL::CComSafeArray;
 
 private:
-    /** std::vector alternative to avoid C++ standard library dependency. */
-    template <class T>
-    class Buffer {
-        public:
-            Buffer(size_t size = 0) : m_size(size) {
-                if (size > 0) {
-                    m_ptr = Allocate(size);
-                    m_owning = true;
-                }
-            }
-            Buffer(const Buffer& other, bool deep_copy) : m_size(other.m_size) {
-                if (deep_copy) {
-                    m_ptr = Allocate(m_size);
-                    m_owning = true;
-
-                    for (size_t i = 0; i < m_size; i++)
-                        m_ptr[i] = other.m_ptr[i];
-                } else {
-                    m_ptr = other.m_ptr;
-                    m_owning = false;
-                }
-            }
-
-            ~Buffer() {
-                if (m_ptr && m_owning)
-                    Free(m_ptr, m_size);
-                m_ptr = nullptr;
-            }
-
-            size_t size() const {
-                return m_size;
-            }
-
-            T * data() {
-                return m_ptr;
-            }
-
-            T& operator [](size_t idx) {
-                return m_ptr[idx];
-            }
-            const T& operator [](size_t idx) const {
-                return m_ptr[idx];
-            }
-
-            void resize (size_t size, T val = T()) noexcept {
-                assert(m_owning);
-
-                // allocate new buffer
-                T * new_ptr = nullptr;
-                if (size > 0) {
-                    new_ptr = Allocate(size);
-                    m_owning = true;
-
-                    for (size_t i = 0; i < std::min(m_size, size); ++i)
-                        new_ptr[i] = m_ptr[i];
-
-                    for (size_t i = std::min(m_size, size); i < size; ++i)
-                        new_ptr[i] = val;
-                }
-                // delete old buffer
-                if (m_ptr && m_owning)
-                    Free(m_ptr, m_size);
-                // commit changes
-                m_ptr = new_ptr;
-                m_size = size;
-            }
-
-            Buffer(const Buffer& other) = delete;
-            Buffer(Buffer&&) = delete;
-            Buffer& operator = (const Buffer&) = delete;
-            Buffer& operator = (Buffer&&) = delete;
-
-        private:
-            static T* Allocate(size_t size) {
-                auto* ptr = (T*)malloc(sizeof(T)*size);
-                for (size_t i = 0; i < size; i++)
-                    new (&ptr[i]) T();
-
-                return ptr;
-            }
-            
-            static void Free (T* ptr, size_t size) {
-                for (size_t i = 0; i < size; i++)
-                    ptr[i].~T();
-                free(ptr);
-            }
-            
-            size_t m_size = 0;
-            T  *   m_ptr = nullptr;
-            bool   m_owning = true;
-    };
-
     enum TYPE {
         TYPE_EMPTY,
         TYPE_DATA,
