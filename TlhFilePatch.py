@@ -292,7 +292,7 @@ def PatchTlhFile(tlh_file_in, tlh_file_out, tli_file_in, remove_header, cross_pl
     # add includes at the top of the file
     source = ExtractIncludes(cpp_content) + source
     
-    with open(tlh_file_out, 'w') as f:
+    with open(tlh_file_out, 'w', newline='\r\n') as f:
         for line in source:
             f.write(line)
 
@@ -313,7 +313,7 @@ def PatchTliFile(tli_file_in, tli_file_out, remove_header, cross_platorm):
             line = line.replace("__uuidof(this)", "__uuidof(std::remove_reference_t<decltype(*this)>)")
             source[i] = line
     
-    with open(tli_file_out, 'w') as f:
+    with open(tli_file_out, 'w', newline='\r\n') as f:
         for line in source:
             f.write(line)
 
