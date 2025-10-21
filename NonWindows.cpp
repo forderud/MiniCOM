@@ -33,6 +33,17 @@ ATL::CComTypeWrapper<IUnknown*>::type& CComSafeArray<IUnknown*>::GetAt (int idx)
 }
 
 template <> __attribute__((visibility("default")))
+HRESULT ATL::CComSafeArray<IUnknown*>::SetAt(int idx, IUnknown* const& val, [[maybe_unused]] bool copy) {
+    if (!val || idx < 0 || static_cast<size_t>(idx) >= m_ptr->pointers.size())
+        return E_INVALIDARG;
+
+    assert(m_ptr);
+    assert(m_ptr->type == SAFEARRAY::TYPE_POINTERS);
+    m_ptr->pointers[idx] = val;
+    return S_OK;
+}
+
+template <> __attribute__((visibility("default")))
 HRESULT ATL::CComSafeArray<BSTR>::Add (const typename CComTypeWrapper<BSTR>::type& t, BOOL copy) {
     (void)copy; // mute unreferenced argument warning
 

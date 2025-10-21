@@ -1263,6 +1263,7 @@ template <> CComSafeArray<BSTR>::CComSafeArray (UINT size);
 template <> CComSafeArray<IUnknown*>::CComSafeArray (UINT size);
 template <> CComTypeWrapper<BSTR>::type& CComSafeArray<BSTR>::GetAt (int idx) const;
 template <> CComTypeWrapper<IUnknown*>::type& CComSafeArray<IUnknown*>::GetAt (int idx) const;
+template <> HRESULT CComSafeArray<IUnknown*>::SetAt (int idx, IUnknown* const& val, bool copy);
 template <> HRESULT                      CComSafeArray<BSTR>::Add (const typename CComTypeWrapper<BSTR>::type& t, BOOL copy);
 template <> HRESULT                 CComSafeArray<IUnknown*>::Add (const typename CComTypeWrapper<IUnknown*>::type& t, BOOL copy);
 template <> unsigned int CComSafeArray<BSTR>::GetCount () const;
