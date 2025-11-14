@@ -34,7 +34,10 @@ ATL::CComTypeWrapper<IUnknown*>::type& CComSafeArray<IUnknown*>::GetAt (int idx)
 
 template <> __attribute__((visibility("default")))
 HRESULT ATL::CComSafeArray<IUnknown*>::SetAt(int idx, IUnknown* const& val, [[maybe_unused]] bool copy) {
-    if (!val || idx < 0 || static_cast<size_t>(idx) >= m_ptr->pointers.size())
+    assert(val);
+    assert(static_cast<size_t>(idx) < m_ptr->pointers.size());
+
+    if (static_cast<size_t>(idx) >= m_ptr->pointers.size())
         return E_INVALIDARG;
 
     assert(m_ptr);
