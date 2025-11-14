@@ -1163,9 +1163,15 @@ struct CComSafeArray {
     }
 
     CComSafeArray (const CComSafeArray&) = delete;
-    CComSafeArray (CComSafeArray&&) = default;
     CComSafeArray& operator = (const CComSafeArray&) = delete;
-    CComSafeArray& operator = (CComSafeArray&&) = default;
+
+    CComSafeArray (CComSafeArray&& other) {
+        std::swap(m_ptr, other.m_ptr);
+    }
+    CComSafeArray& operator = (CComSafeArray&& other) {
+        std::swap(m_ptr, other.m_ptr);
+        return *this;
+    }
 
     HRESULT Destroy() {
         if (m_ptr) {
