@@ -701,7 +701,7 @@ private:
 };
 
 #define OBJECT_ENTRY_AUTO(clsid, cls) \
-    __attribute__((weak)) const char* tmp_factory_##cls = IUnknownFactory::RegisterClass<cls>(clsid, #cls);
+    __attribute__((weak)) __attribute__((used)) const char* tmp_factory_##cls = IUnknownFactory::RegisterClass<cls>(clsid, #cls);
 
 
 /** Mostly API-compatible subset of the Microsoft _com_ptr_t class documented on https://docs.microsoft.com/en-us/cpp/cpp/com-ptr-t-class */
