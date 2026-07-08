@@ -90,8 +90,37 @@ protected:
         /** QueryInterface doesn't adhere to the COM aggregation rules for inner objects, since it lacks special handling of IUnknown.
             Still, this only affect IWeakRef clients and is not noticable for clients unaware of this interface.
             DOC: https://learn.microsoft.com/en-us/windows/win32/com/aggregation */
-        HRESULT QueryInterface(const IID& iid, void** obj) override {
-            return m_parent.QueryInterface(iid, obj);
+        HRESULT QueryInterface(const IID& iid, void** ptr) override {
+            if (!ptr)
+                return E_INVALIDARG;
+
+            *ptr = nullptr;
+            if (iid == __uuidof(IWeakRef)) {
+                // special handling of weak reference to object
+                *ptr = static_cast<IWeakRef*>(this);
+                m_parent.m_refs.AddRef(false);
+                return S_OK;
+            } else {
+                // all other interfaces require a preexisting strong reference
+                if (!m_parent.Inner())
+                    return E_NOT_SET;
+
+                // add temporarily strong reference to avoid concurrent deletion by other threads 
+                ULONG strong = m_parent.AddRef();
+                if (strong <= 1) {
+                    // object was just destroyed
+                    m_parent.Release();
+                    return E_NOT_SET;
+                }
+
+                // forward call to parent object
+                HRESULT hr = m_parent.QueryInterface(iid, ptr);
+
+                // release temporary strong reference
+                m_parent.Release();
+
+                return hr;
+            }
         }
 
         ULONG AddRef() override {
