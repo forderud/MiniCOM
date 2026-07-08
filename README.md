@@ -32,3 +32,4 @@ The repo also contains a [`SharedRef`](SharedRef.hpp) wrapper class for non-owni
 
 ### External references 
 * Raymond Chen: [Inside STL: Smart pointers](https://devblogs.microsoft.com/oldnewthing/20230814-00/?p=108597)
+* LLVM [`__shared_weak_count::__release_weak()`](https://github.com/llvm/llvm-project/blob/main/libcxx/src/memory.cpp#L60) implementation
