@@ -32,7 +32,7 @@ The repo also contains a [`SharedRef`](SharedRef.hpp) wrapper class for non-owni
 
 ### External references 
 * Raymond Chen: [Inside STL: Smart pointers](https://devblogs.microsoft.com/oldnewthing/20230814-00/?p=108597)
-* Microsoft: [`_Ref_count_base::_Decref()`](https://github.com/microsoft/STL/blob/main/stl/inc/memory#L1181), [`_Ref_count_base::_Decwref()`](https://github.com/microsoft/STL/blob/main/stl/inc/memory#L1188)
+* Microsoft: [`_Ref_count_base::_Decref()`](https://github.com/microsoft/STL/blob/main/stl/inc/memory#L1181), [`_Ref_count_base::_Decwref()`](https://github.com/microsoft/STL/blob/main/stl/inc/memory#L1188) implementation
 * LLVM [`__shared_count::__release_shared()`](https://github.com/llvm/llvm-project/blob/main/libcxx/src/memory.cpp#L42), [`__shared_weak_count::__release_weak()`](https://github.com/llvm/llvm-project/blob/main/libcxx/src/memory.cpp#L60) implementation
 * GCC [`_Sp_counted_base<_S_atomic>::_M_release()`](https://github.com/gcc-mirror/gcc/blob/master/libstdc%2B%2B-v3/include/bits/shared_ptr_base.h#L392), [`_Sp_counted_base::_M_weak_release()`](https://github.com/gcc-mirror/gcc/blob/master/libstdc%2B%2B-v3/include/bits/shared_ptr_base.h#L213) implementation
 
