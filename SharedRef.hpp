@@ -58,19 +58,20 @@ public:
     }
 
     ULONG Release() override {
-        RefBlock refs = m_refs.Release(true);
+        ULONG strong = m_refs.Release(true);
 
-        if (Inner() && !refs.strong) {
-            // release object handle
-            auto* ptr = Inner();
-            ClearInner();
-            ptr->Release(); // might trigger reentrancy, so don't touch members afterwards
+        if (!strong) {
+            if (Inner()) {
+                // release object handle
+                auto* ptr = Inner();
+                ClearInner();
+                ptr->Release(); // might trigger reentrancy, so don't touch members afterwards
+            }
+
+            m_weak.Release(); // also release weak reference when strong=0
         }
 
-        if (!refs.strong && !refs.weak)
-            delete this;
-
-        return refs.strong;
+        return strong;
     }
 
     static ULONG ObjectCount() {
@@ -128,21 +129,17 @@ protected:
         }
 
         ULONG Release() override {
-            RefBlock refs = m_parent.m_refs.Release(false);
-            if (!refs.strong && !refs.weak)
+            ULONG weak = m_parent.m_refs.Release(false);
+            if (!weak)
                 delete &m_parent;
 
-            return refs.weak;
+            return weak;
         }
 
     private:
         SharedRefBase& m_parent;
     };
 
-    struct RefBlock {
-        uint32_t strong = 0; // strong use-count for m_inner lifetime
-        uint32_t weak = 0;   // weak ref-count for SharedRefBase lifetime
-    };
     /** Thread-safe handling of strong & weak reference-counts. */
     struct AtomicRefBlock {
     public:
@@ -156,20 +153,19 @@ protected:
             }
         }
 
-        /** Returns a copy of the struct to facillitate a thread safe parent class. */
-        RefBlock Release(bool _strong) {
+        ULONG Release(bool _strong) {
             if (_strong) {
                 //std::cout << "  strong=" << (strong - 1) << " weak=" << weak << std::endl;
-                return { --strong, weak };
+                return --strong;
             } else {
                 //std::cout << "  strong=" << strong << " weak=" << (weak - 1) << std::endl;
-                return { strong, --weak };
+                return --weak;
             }
         }
 
     protected:
         std::atomic<uint32_t> strong = 0; // strong ref-count for m_inner lifetime
-        std::atomic<uint32_t> weak = 0;   // weak ref-count for SharedRefBase lifetime
+        std::atomic<uint32_t> weak = 1;   // weak ref-count for SharedRefBase lifetime + 1 if strong>0
     };
 
     /** Get or set pointer to inner object. */
