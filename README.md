@@ -33,5 +33,5 @@ The repo also contains a [`SharedRef`](SharedRef.hpp) wrapper class for non-owni
 ### External references 
 * Raymond Chen: [Inside STL: Smart pointers](https://devblogs.microsoft.com/oldnewthing/20230814-00/?p=108597)
 * LLVM [`__shared_weak_count::__release_weak()`](https://github.com/llvm/llvm-project/blob/main/libcxx/src/memory.cpp#L60) implementation
-* GCC [`_Sp_counted_base<_S_single>::_M_release()`](https://github.com/gcc-mirror/gcc/blob/master/libstdc%2B%2B-v3/include/bits/shared_ptr_base.h#L369), [`_Sp_counted_base::_M_weak_release()`](https://github.com/gcc-mirror/gcc/blob/master/libstdc%2B%2B-v3/include/bits/shared_ptr_base.h#L213) implementation
+* GCC [`_Sp_counted_base<_S_atomic>::_M_release()`](https://github.com/gcc-mirror/gcc/blob/master/libstdc%2B%2B-v3/include/bits/shared_ptr_base.h#L392), [`_Sp_counted_base::_M_weak_release()`](https://github.com/gcc-mirror/gcc/blob/master/libstdc%2B%2B-v3/include/bits/shared_ptr_base.h#L213) implementation
 
