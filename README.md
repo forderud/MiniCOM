@@ -31,8 +31,8 @@ Contributions for addressing missing features are welcome.
 The repo also contains a [`SharedRef`](SharedRef.hpp) wrapper class for non-owning weak references through a `IWeakRef` interface. This is similar to [`IWeakReference`](https://learn.microsoft.com/en-us/windows/win32/api/weakreference/nn-weakreference-iweakreference), but is also compatible with classical `IUnknown`-based COM.
 
 #### External references 
-* Raymond Chen: [Inside STL: Smart pointers](https://devblogs.microsoft.com/oldnewthing/20230814-00/?p=108597)
-* Microsoft: [`_Ref_count_base::_Decref()`](https://github.com/microsoft/STL/blob/main/stl/inc/memory#L1181), [`_Ref_count_base::_Decwref()`](https://github.com/microsoft/STL/blob/main/stl/inc/memory#L1188) implementation (fairly elegant, used as inspiration for `SharedRef`)
+* Raymond Chen: [Inside STL: Smart pointers](https://devblogs.microsoft.com/oldnewthing/20230814-00/?p=108597) (documents the weak ref-count trick)
+* Microsoft: [`_Ref_count_base::_Decref()`](https://github.com/microsoft/STL/blob/main/stl/inc/memory#L1181), [`_Ref_count_base::_Decwref()`](https://github.com/microsoft/STL/blob/main/stl/inc/memory#L1188) implementation (used as inspiration for `SharedRef`)
 * LLVM [`__shared_count::__release_shared()`](https://github.com/llvm/llvm-project/blob/main/libcxx/src/memory.cpp#L42), [`__shared_weak_count::__release_weak()`](https://github.com/llvm/llvm-project/blob/main/libcxx/src/memory.cpp#L60) implementation
 * GCC [`_Sp_counted_base<_S_atomic>::_M_release()`](https://github.com/gcc-mirror/gcc/blob/master/libstdc%2B%2B-v3/include/bits/shared_ptr_base.h#L392), [`_Sp_counted_base::_M_weak_release()`](https://github.com/gcc-mirror/gcc/blob/master/libstdc%2B%2B-v3/include/bits/shared_ptr_base.h#L213) implementation
 
