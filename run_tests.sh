@@ -6,7 +6,7 @@ set -e # stop on first failure
 rm -f a.out
 
 # build test suite
-g++ NonWindows.cpp tests.cpp
+g++ -std=c++17 NonWindows.cpp tests.cpp
 
 # run test suite
 ./a.out
