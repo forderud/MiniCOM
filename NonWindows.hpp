@@ -638,7 +638,9 @@ private:
     }
 
     /** Create COM class based on CLSID. */
-    static HRESULT CreateInstance (GUID clsid, IUnknown* outer, /*out*/IUnknown** result) {
+    static HRESULT CoCreateInstance (const GUID& clsid, IUnknown* outer, DWORD context, /*out*/IUnknown** result) {
+        (void)context;
+
         for (size_t i = 0; i < Factories().size(); i++) {
             const auto & elm = Factories()[i];
             if (elm.clsid == clsid) {
@@ -836,10 +838,8 @@ public:
     }
 
     HRESULT CreateInstance (const GUID& clsid, IUnknown* outer = nullptr, DWORD context = CLSCTX_ALL) noexcept {
-        (void)context;
-
         _com_ptr_t<IUnknown> tmp1;
-        HRESULT hr = IUnknownFactory::CreateInstance(clsid, outer, &tmp1);
+        HRESULT hr = IUnknownFactory::CoCreateInstance(clsid, outer, context, &tmp1);
         if (FAILED(hr))
             return hr;
 
@@ -852,8 +852,6 @@ public:
     }
 
     HRESULT CreateInstance(const wchar_t* name, IUnknown* outer = nullptr, DWORD context = CLSCTX_ALL) noexcept {
-        (void)context;
-
         if (!name)
             return E_INVALIDARG;
         
@@ -863,7 +861,7 @@ public:
             return hr;
 
         _com_ptr_t<IUnknown> tmp1;
-        hr = IUnknownFactory::CreateInstance(clsid, outer, &tmp1);
+        hr = IUnknownFactory::CoCreateInstance(clsid, outer, context, &tmp1);
         if (FAILED(hr))
             return hr;
 
@@ -993,15 +991,13 @@ public:
     }
 
     HRESULT CoCreateInstance (std::wstring name, IUnknown* outer = NULL, DWORD context = CLSCTX_ALL) {
-        (void)context;
-
         GUID clsid{};
         HRESULT hr = IUnknownFactory::CLSIDFromProgID(name.c_str(), &clsid);
         if (FAILED(hr))
             return hr;
 
         IUnknown* tmp0 = nullptr;
-        hr = IUnknownFactory::CreateInstance(clsid, outer, &tmp0); // RefCount=1
+        hr = IUnknownFactory::CoCreateInstance(clsid, outer, context, &tmp0); // RefCount=1
         if (FAILED(hr))
             return hr;
 
@@ -1018,9 +1014,8 @@ public:
     }
 
     HRESULT CoCreateInstance (GUID clsid, IUnknown* outer = NULL, DWORD context = CLSCTX_ALL) {
-        (void)context;
         IUnknown* tmp0 = nullptr;
-        HRESULT hr = IUnknownFactory::CreateInstance(clsid, outer, &tmp0); // RefCount=1
+        HRESULT hr = IUnknownFactory::CoCreateInstance(clsid, outer, context, &tmp0); // RefCount=1
         if (FAILED(hr))
             return hr;
 
