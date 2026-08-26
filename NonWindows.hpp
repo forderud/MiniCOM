@@ -75,6 +75,8 @@ static_assert(sizeof(int) == 4, "int size not 32bit");
 #define E_OUTOFMEMORY  static_cast<int32_t>(0x8007000EL)
 #define E_INVALIDARG   static_cast<int32_t>(0x80070057L)
 #define E_NOT_SET      static_cast<int32_t>(0x80070490L)
+#define REGDB_E_CLASSNOTREG static_cast<int32_t>(0x80040154L)
+#define CO_E_CLASSSTRING    static_cast<int32_t>(0x800401F3L)
 
 
 enum CLSCTX { 
