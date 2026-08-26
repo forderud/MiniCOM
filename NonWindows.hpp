@@ -598,8 +598,13 @@ private:
         Factory       factory = nullptr;
     };
 
-    /** Create COM class based on "[<Program>.]<Component>[.<Version>]" ProgID string. */
-    static HRESULT CreateInstance (std::wstring class_name, IUnknown* outer, /*out*/IUnknown** result) {
+    /** Resolve COM class CLSID based on "[<Program>.]<Component>[.<Version>]" ProgID string. */
+    static HRESULT CLSIDFromProgID (const wchar_t* ProgID, /*out*/GUID* clsid) {
+        if (!ProgID || !clsid)
+            return E_POINTER;
+        
+        std::wstring class_name = ProgID;
+
         // remove "<Program>." prefix and ".<Version>" suffix if present
         size_t idx1 = class_name.find(L'.');
         if (idx1 != std::wstring::npos) {
@@ -623,12 +628,13 @@ private:
         for (size_t i = 0; i < Factories().size(); i++) {
             const auto & elm = Factories()[i];
             if (elm.name == ATL::CComBSTR(class_name.c_str())) {
-                return CreateInstance(elm.clsid, outer, result);
+                *clsid = elm.clsid;
+                return S_OK;
             }
         }
 
-        std::wcerr << L"CoCreateInstance error: Unknown class " << class_name << std::endl;
-        return REGDB_E_CLASSNOTREG;
+        std::wcerr << L"CLSIDFromProgID error: Unknown class " << class_name << std::endl;
+        return CO_E_CLASSSTRING;
     }
 
     /** Create COM class based on CLSID. */
@@ -850,9 +856,14 @@ public:
 
         if (!name)
             return E_INVALIDARG;
+        
+        GUID clsid{};
+        HRESULT hr = IUnknownFactory::CLSIDFromProgID(name, &clsid);
+        if (FAILED(hr))
+            return hr;
 
         _com_ptr_t<IUnknown> tmp1;
-        HRESULT hr = IUnknownFactory::CreateInstance(name, outer, &tmp1);
+        hr = IUnknownFactory::CreateInstance(clsid, outer, &tmp1);
         if (FAILED(hr))
             return hr;
 
@@ -984,8 +995,13 @@ public:
     HRESULT CoCreateInstance (std::wstring name, IUnknown* outer = NULL, DWORD context = CLSCTX_ALL) {
         (void)context;
 
+        GUID clsid{};
+        HRESULT hr = IUnknownFactory::CLSIDFromProgID(name.c_str(), &clsid);
+        if (FAILED(hr))
+            return hr;
+
         IUnknown* tmp0 = nullptr;
-        HRESULT hr = IUnknownFactory::CreateInstance(name, outer, &tmp0); // RefCount=1
+        hr = IUnknownFactory::CreateInstance(clsid, outer, &tmp0); // RefCount=1
         if (FAILED(hr))
             return hr;
 
