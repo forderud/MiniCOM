@@ -623,12 +623,7 @@ private:
         for (size_t i = 0; i < Factories().size(); i++) {
             const auto & elm = Factories()[i];
             if (elm.name == ATL::CComBSTR(class_name.c_str())) {
-                IUnknown* obj = nullptr;
-                HRESULT hr = elm.factory(outer, &obj);
-                assert(hr == S_OK);
-                if (SUCCEEDED(hr))
-                    *result = obj;
-                return hr;
+                return CreateInstance(elm.clsid, outer, result);
             }
         }
 
