@@ -18,26 +18,13 @@ HRESULT CoCreateInstance (const GUID& rclsid, IUnknown* pUnkOuter,
         return E_POINTER;
     *ppv = nullptr;
 
-    // Look the class up before creating it. IUnknownFactory::CreateInstance
-    // asserts on an unregistered CLSID, which is a reasonable debugging aid for
-    // C++ callers but would abort a caller that is entitled to an HRESULT --
-    // ole32 returns REGDB_E_CLASSNOTREG here.
-    bool registered = false;
-    for (size_t i = 0; i < IUnknownFactory::Factories().size(); i++) {
-        if (IUnknownFactory::Factories()[i].clsid == rclsid) {
-            registered = true;
-            break;
-        }
-    }
-    if (!registered)
-        return REGDB_E_CLASSNOTREG;
-
-    IUnknown* obj = IUnknownFactory::CreateInstance(rclsid, pUnkOuter);
-    if (!obj)
-        return E_FAIL;
+    IUnknown* obj = nullptr;
+    HRESULT hr = IUnknownFactory::CreateInstance(rclsid, pUnkOuter, &obj);
+    if (FAILED(hr))
+        return hr;                  // REGDB_E_CLASSNOTREG for an unknown class
 
     // Hand back the interface asked for, as ole32 does, rather than IUnknown.
-    HRESULT hr = obj->QueryInterface(riid, ppv);
+    hr = obj->QueryInterface(riid, ppv);
     obj->Release();                 // QueryInterface took its own reference
     return hr;
 }
