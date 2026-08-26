@@ -27,6 +27,39 @@ There's no point in supporting Windows, since the same functionality is already 
 
 Contributions for addressing missing features are welcome.
 
+## Binding from other languages
+
+`CoCreateInstance` and `CLSIDFromProgID` are provided with the same names and
+signatures as on Windows, so the same source creates objects on either platform.
+They are `extern "C"`, and the reference parameters are pointers at the ABI
+level, so a caller with only a C FFI can use them as they stand:
+
+```python
+lib.CLSIDFromProgID("Example", ctypes.byref(clsid))          # -> S_OK
+lib.CoCreateInstance(ctypes.byref(clsid), None, CLSCTX_INPROC_SERVER,
+                     ctypes.byref(iid), ctypes.byref(obj))   # -> S_OK
+```
+
+Two further things are worth knowing before writing such a binding, because both
+are invisible from the outside and neither fails in a way that points at itself.
+
+**`IUnknown` is a virtual base, so a secondary interface pointer cannot be used
+for reference counting.** `IdlParse.py` emits `struct IFoo : virtual public
+IUnknown` — to avoid duplicating `m_ref` under multiple inheritance — and with
+virtual inheritance the secondary interface's vtable holds *null* where
+`QueryInterface`/`AddRef`/`Release` would be. Those live in the virtual base,
+reached through the vtable's virtual-base offset. C++ performs that adjustment
+silently; a binding calling through the raw vtable jumps to address zero. The
+simple rule is to keep the pointer `CoCreateInstance` returned (or one obtained
+by querying for `IID_IUnknown`) and do all lifetime management through it, using
+other interface pointers only to call their own methods. Reference counts are
+per object rather than per interface, so this is safe.
+
+**Method slots are offset by two relative to Windows.** `IUnknown` here declares
+a virtual destructor, which the Itanium ABI gives two vtable slots, so
+`QueryInterface` sits at slot 2 and an interface's own methods start at slot 5 —
+against 0 and 3 for MSVC COM. A binding targeting both needs that constant.
+
 ## Shared & weak references
 The repo also contains a [`SharedRef`](SharedRef.hpp) wrapper class for non-owning weak references through a `IWeakRef` interface. This is similar to [`IWeakReference`](https://learn.microsoft.com/en-us/windows/win32/api/weakreference/nn-weakreference-iweakreference), but is also compatible with classical `IUnknown`-based COM.
 

@@ -8,6 +8,56 @@ Buffer<IUnknownFactory::Entry> & IUnknownFactory::Factories () {
 }
 
 
+/* ole32-parity object creation. Defined here, beside Factories(), because this
+   is the one translation unit compiled into the library -- the rest of MiniCOM
+   is header-only and so exports nothing a C caller can link against. */
+extern "C" __attribute__((visibility("default")))
+HRESULT CoCreateInstance (const GUID& rclsid, IUnknown* pUnkOuter,
+                          DWORD /*dwClsContext*/, const GUID& riid, void** ppv) {
+    if (!ppv)
+        return E_POINTER;
+    *ppv = nullptr;
+
+    // Look the class up before creating it. IUnknownFactory::CreateInstance
+    // asserts on an unregistered CLSID, which is a reasonable debugging aid for
+    // C++ callers but would abort a caller that is entitled to an HRESULT --
+    // ole32 returns REGDB_E_CLASSNOTREG here.
+    bool registered = false;
+    for (size_t i = 0; i < IUnknownFactory::Factories().size(); i++) {
+        if (IUnknownFactory::Factories()[i].clsid == rclsid) {
+            registered = true;
+            break;
+        }
+    }
+    if (!registered)
+        return REGDB_E_CLASSNOTREG;
+
+    IUnknown* obj = IUnknownFactory::CreateInstance(rclsid, pUnkOuter);
+    if (!obj)
+        return E_FAIL;
+
+    // Hand back the interface asked for, as ole32 does, rather than IUnknown.
+    HRESULT hr = obj->QueryInterface(riid, ppv);
+    obj->Release();                 // QueryInterface took its own reference
+    return hr;
+}
+
+extern "C" __attribute__((visibility("default")))
+HRESULT CLSIDFromProgID (const wchar_t* lpszProgID, GUID* lpclsid) {
+    if (!lpszProgID || !lpclsid)
+        return E_POINTER;
+
+    for (size_t i = 0; i < IUnknownFactory::Factories().size(); i++) {
+        const auto& elm = IUnknownFactory::Factories()[i];
+        if (elm.name == ATL::CComBSTR(lpszProgID)) {
+            *lpclsid = elm.clsid;
+            return S_OK;
+        }
+    }
+    return CO_E_CLASSSTRING;
+}
+
+
 template <> __attribute__((visibility("default")))
 ATL::CComSafeArray<BSTR>::CComSafeArray (UINT size) {
     m_ptr = SAFEARRAY::Create(SAFEARRAY::TYPE_STRINGS);

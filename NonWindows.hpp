@@ -582,12 +582,40 @@ private:
 };
 
 
+/** Windows COM object-creation API, for parity with ole32.
+
+    These already exist on Windows, so declaring them here means the same source
+    creates objects on every platform -- which is the point of this library.
+    CLSCTX is modelled above but was previously unused; this is what uses it.
+
+    They also give callers outside C++ a supported way in. Object creation is
+    otherwise reachable only through the header-only
+    IUnknownFactory::CreateInstance, and the only creation-related *export* is
+    the mangled IUnknownFactory::Factories() -- so a Python or C# binding ends
+    up calling a C++ symbol by its Itanium-mangled name and walking
+    Buffer<Entry>'s layout by hand. Neither is part of any contract.
+
+    extern "C" keeps the symbols unmangled and the reference parameters are
+    pointers at the ABI level, so a C FFI can call them as they stand.
+
+    dwClsContext is accepted for signature parity and ignored: everything here
+    is in-process. */
+extern "C" {
+    HRESULT CoCreateInstance (const GUID& rclsid, IUnknown* pUnkOuter,
+                              DWORD dwClsContext, const GUID& riid, void** ppv);
+    HRESULT CLSIDFromProgID (const wchar_t* lpszProgID, GUID* lpclsid);
+}
+
+
 /** Internal class that SHALL ONLY be accessed through _com_ptr_t<T> or CComPtr<T> to preserve Windows compatibility. */
 class IUnknownFactory {
     template<typename T>
     friend class _com_ptr_t;
     template<typename T>
     friend class ATL::CComPtr;
+    // ole32-parity entry points, so non-C++ callers can create objects too.
+    friend HRESULT CoCreateInstance (const GUID&, IUnknown*, DWORD, const GUID&, void**);
+    friend HRESULT CLSIDFromProgID (const wchar_t*, GUID*);
 
 private:
     typedef HRESULT(*Factory)(IUnknown*, IUnknown**);
