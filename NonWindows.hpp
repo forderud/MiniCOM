@@ -638,17 +638,27 @@ private:
     }
 
     /** Create COM class based on CLSID. */
-    static HRESULT CoCreateInstance (const GUID& clsid, IUnknown* outer, DWORD context, /*out*/IUnknown** result) {
+    static HRESULT CoCreateInstance (const GUID& clsid, IUnknown* outer, DWORD context, const GUID& iid, /*out*/void** result) {
         (void)context;
+
+        if (!result)
+            return E_POINTER;
+        *result = nullptr;
 
         for (size_t i = 0; i < Factories().size(); i++) {
             const auto & elm = Factories()[i];
             if (elm.clsid == clsid) {
                 IUnknown* obj = nullptr;
-                HRESULT hr = elm.factory(outer, &obj);
+                HRESULT hr = elm.factory(outer, &obj); // RefCount=1
                 assert(hr == S_OK);
-                if (SUCCEEDED(hr))
-                    *result = obj;
+                if (FAILED(hr))
+                    return hr;
+
+                // cast to requested interface
+                assert(obj);
+                hr = obj->QueryInterface(iid, result);
+                obj->Release();
+                obj = nullptr;
                 return hr;
             }
         }
@@ -838,16 +848,12 @@ public:
     }
 
     HRESULT CreateInstance (const GUID& clsid, IUnknown* outer = nullptr, DWORD context = CLSCTX_ALL) noexcept {
-        _com_ptr_t<IUnknown> tmp1;
-        HRESULT hr = IUnknownFactory::CoCreateInstance(clsid, outer, context, &tmp1);
+        _com_ptr_t tmp;
+        HRESULT hr = IUnknownFactory::CoCreateInstance(clsid, outer, context, __uuidof(T), (void**)&tmp);
         if (FAILED(hr))
             return hr;
 
-        _com_ptr_t tmp2 = tmp1; // cast
-        if (!tmp2)
-            return E_NOINTERFACE;
-
-        Swap(tmp2);
+        Swap(tmp);
         return S_OK;
     }
 
@@ -860,16 +866,12 @@ public:
         if (FAILED(hr))
             return hr;
 
-        _com_ptr_t<IUnknown> tmp1;
-        hr = IUnknownFactory::CoCreateInstance(clsid, outer, context, &tmp1);
+        _com_ptr_t tmp;
+        hr = IUnknownFactory::CoCreateInstance(clsid, outer, context, __uuidof(T), (void**)&tmp);
         if (FAILED(hr))
             return hr;
 
-        _com_ptr_t tmp2 = tmp1; // cast
-        if (!tmp2)
-            return E_NOINTERFACE;
-
-        Swap(tmp2);
+        Swap(tmp);
         return S_OK;
     }
 
@@ -996,38 +998,22 @@ public:
         if (FAILED(hr))
             return hr;
 
-        IUnknown* tmp0 = nullptr;
-        hr = IUnknownFactory::CoCreateInstance(clsid, outer, context, &tmp0); // RefCount=1
+        CComPtr tmp;
+        hr = IUnknownFactory::CoCreateInstance(clsid, outer, context, __uuidof(T), (void**)&tmp); // RefCount=1
         if (FAILED(hr))
             return hr;
 
-        CComPtr<IUnknown> tmp1;
-        tmp1.Attach(tmp0);
-
-        CComPtr tmp2;
-        tmp2 = tmp1; // cast
-        if (!tmp2)
-            return E_FAIL;
-
-        Swap(tmp2);
+        Swap(tmp);
         return S_OK;
     }
 
     HRESULT CoCreateInstance (GUID clsid, IUnknown* outer = NULL, DWORD context = CLSCTX_ALL) {
-        IUnknown* tmp0 = nullptr;
-        HRESULT hr = IUnknownFactory::CoCreateInstance(clsid, outer, context, &tmp0); // RefCount=1
+        CComPtr tmp;
+        HRESULT hr = IUnknownFactory::CoCreateInstance(clsid, outer, context, __uuidof(T), (void**)&tmp); // RefCount=1
         if (FAILED(hr))
             return hr;
 
-        CComPtr<IUnknown> tmp1;
-        tmp1.Attach(tmp0);
-
-        CComPtr tmp2;
-        tmp2 = tmp1; // cast
-        if (!tmp2)
-            return E_FAIL;
-
-        Swap(tmp2);
+        Swap(tmp);
         return S_OK;
     }
 
