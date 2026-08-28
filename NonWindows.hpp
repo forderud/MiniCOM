@@ -787,6 +787,11 @@ public:
         return CompareUnknown(p) == 0;
     }
 
+    template<typename U, ::std::enable_if_t<!::std::is_same<U, T>::value, int> = 0>
+    bool operator==(U* p) const {
+        return CompareUnknown(p) == 0;
+    }
+
     HRESULT CreateInstance (const GUID& clsid, IUnknown* outer = nullptr, DWORD context = CLSCTX_ALL) noexcept {
         _com_ptr_t tmp;
         HRESULT hr = ::CoCreateInstance(clsid, outer, context, __uuidof(T), (void**)&tmp);
@@ -824,8 +829,9 @@ private:
         other.m_ptr = tmp;
     }
 
-    ptrdiff_t CompareUnknown(T * p) const {
-        static_assert(std::is_base_of<IUnknown, T>::value, "_com_ptr_t::CompareUnknown: T must inherit from IUnknown");
+    template<typename U>
+    ptrdiff_t CompareUnknown(U * p) const {
+        static_assert(std::is_base_of<IUnknown, U>::value, "_com_ptr_t::CompareUnknown: U must inherit from IUnknown");
 
         IUnknown* pu1 = nullptr;
         IUnknown* pu2 = nullptr;
