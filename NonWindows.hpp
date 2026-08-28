@@ -38,7 +38,7 @@ static_assert(sizeof(GUID) == 16, "GUID not packed");
 
 // __uuidof emulation
 template<typename Q>
-static GUID hold_uuidof () { return {}; }
+static GUID hold_uuidof () { abort(); } // crash if performing __uuidof() on unregistered interface
 #define DEFINE_UUIDOF_ID(Q, IID) template<> inline GUID hold_uuidof<Q>() { return IID; }
 #define DEFINE_UUIDOF(Q) DEFINE_UUIDOF_ID(Q, IID_##Q)
 #define __uuidof(Q) hold_uuidof<Q>()
