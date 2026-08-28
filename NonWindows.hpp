@@ -598,8 +598,13 @@ private:
         Factory       factory = nullptr;
     };
 
-    /** Create COM class based on "[<Program>.]<Component>[.<Version>]" ProgID string. */
-    static IUnknown* CreateInstance (std::wstring class_name, IUnknown* outer) {
+    /** Resolve COM class CLSID based on "[<Program>.]<Component>[.<Version>]" ProgID string. */
+    static HRESULT CLSIDFromProgID (const wchar_t* ProgID, /*out*/GUID* clsid) {
+        if (!ProgID || !clsid)
+            return E_POINTER;
+        
+        std::wstring class_name = ProgID;
+
         // remove "<Program>." prefix and ".<Version>" suffix if present
         size_t idx1 = class_name.find(L'.');
         if (idx1 != std::wstring::npos) {
@@ -623,29 +628,38 @@ private:
         for (size_t i = 0; i < Factories().size(); i++) {
             const auto & elm = Factories()[i];
             if (elm.name == ATL::CComBSTR(class_name.c_str())) {
-                IUnknown* obj = nullptr;
-                HRESULT hr = elm.factory(outer, &obj);
-                assert(hr == S_OK);
-                if (SUCCEEDED(hr))
-                    return obj;
+                *clsid = elm.clsid;
+                return S_OK;
             }
         }
 
-        std::wcerr << L"CoCreateInstance error: Unknown class " << class_name << std::endl;
-        assert(false);
-        return nullptr;
+        std::wcerr << L"CLSIDFromProgID error: Unknown class " << class_name << std::endl;
+        return CO_E_CLASSSTRING;
     }
 
     /** Create COM class based on CLSID. */
-    static IUnknown* CreateInstance (GUID clsid, IUnknown* outer) {
+    static HRESULT CoCreateInstance (const GUID& clsid, IUnknown* outer, DWORD context, const GUID& iid, /*out*/void** result) {
+        (void)context;
+
+        if (!result)
+            return E_POINTER;
+        *result = nullptr;
+
         for (size_t i = 0; i < Factories().size(); i++) {
             const auto & elm = Factories()[i];
             if (elm.clsid == clsid) {
                 IUnknown* obj = nullptr;
-                HRESULT hr = elm.factory(outer, &obj);
+                HRESULT hr = elm.factory(outer, &obj); // RefCount=1
                 assert(hr == S_OK);
-                if (SUCCEEDED(hr))
-                    return obj;
+                if (FAILED(hr))
+                    return hr;
+
+                // cast to requested interface
+                assert(obj);
+                hr = obj->QueryInterface(iid, result);
+                obj->Release();
+                obj = nullptr;
+                return hr;
             }
         }
 
@@ -656,8 +670,7 @@ private:
             clsid.Data4[4], clsid.Data4[5], clsid.Data4[6], clsid.Data4[7]);
 
         std::cerr << "CoCreateInstance error: Unknown clsid " << guid_str << std::endl;
-        assert(false);
-        return nullptr;
+        return REGDB_E_CLASSNOTREG;
     }
     
 public:
@@ -835,35 +848,30 @@ public:
     }
 
     HRESULT CreateInstance (const GUID& clsid, IUnknown* outer = nullptr, DWORD context = CLSCTX_ALL) noexcept {
-        (void)context;
+        _com_ptr_t tmp;
+        HRESULT hr = IUnknownFactory::CoCreateInstance(clsid, outer, context, __uuidof(T), (void**)&tmp);
+        if (FAILED(hr))
+            return hr;
 
-        _com_ptr_t<IUnknown> tmp1(IUnknownFactory::CreateInstance(clsid, outer), /*addref*/false);
-        if (!tmp1)
-            return E_FAIL;
-
-        _com_ptr_t tmp2 = tmp1; // cast
-        if (!tmp2)
-            return E_NOINTERFACE;
-
-        Swap(tmp2);
+        Swap(tmp);
         return S_OK;
     }
 
     HRESULT CreateInstance(const wchar_t* name, IUnknown* outer = nullptr, DWORD context = CLSCTX_ALL) noexcept {
-        (void)context;
-
         if (!name)
             return E_INVALIDARG;
+        
+        GUID clsid{};
+        HRESULT hr = IUnknownFactory::CLSIDFromProgID(name, &clsid);
+        if (FAILED(hr))
+            return hr;
 
-        _com_ptr_t<IUnknown> tmp1(IUnknownFactory::CreateInstance(name, outer), /*addref*/false);
-        if (!tmp1)
-            return E_FAIL;
+        _com_ptr_t tmp;
+        hr = IUnknownFactory::CoCreateInstance(clsid, outer, context, __uuidof(T), (void**)&tmp);
+        if (FAILED(hr))
+            return hr;
 
-        _com_ptr_t tmp2 = tmp1; // cast
-        if (!tmp2)
-            return E_NOINTERFACE;
-
-        Swap(tmp2);
+        Swap(tmp);
         return S_OK;
     }
 
@@ -985,39 +993,27 @@ public:
     }
 
     HRESULT CoCreateInstance (std::wstring name, IUnknown* outer = NULL, DWORD context = CLSCTX_ALL) {
-        (void)context;
+        GUID clsid{};
+        HRESULT hr = IUnknownFactory::CLSIDFromProgID(name.c_str(), &clsid);
+        if (FAILED(hr))
+            return hr;
 
-        IUnknown* tmp0 = IUnknownFactory::CreateInstance(name, outer); // RefCount=1
-        if (!tmp0)
-            return E_FAIL;
+        CComPtr tmp;
+        hr = IUnknownFactory::CoCreateInstance(clsid, outer, context, __uuidof(T), (void**)&tmp); // RefCount=1
+        if (FAILED(hr))
+            return hr;
 
-        CComPtr<IUnknown> tmp1;
-        tmp1.Attach(tmp0);
-
-        CComPtr tmp2;
-        tmp2 = tmp1; // cast
-        if (!tmp2)
-            return E_FAIL;
-
-        Swap(tmp2);
+        Swap(tmp);
         return S_OK;
     }
 
     HRESULT CoCreateInstance (GUID clsid, IUnknown* outer = NULL, DWORD context = CLSCTX_ALL) {
-        (void)context;
-        IUnknown* tmp0 = IUnknownFactory::CreateInstance(clsid, outer); // RefCount=1
-        if (!tmp0)
-            return E_FAIL;
+        CComPtr tmp;
+        HRESULT hr = IUnknownFactory::CoCreateInstance(clsid, outer, context, __uuidof(T), (void**)&tmp); // RefCount=1
+        if (FAILED(hr))
+            return hr;
 
-        CComPtr<IUnknown> tmp1;
-        tmp1.Attach(tmp0);
-
-        CComPtr tmp2;
-        tmp2 = tmp1; // cast
-        if (!tmp2)
-            return E_FAIL;
-
-        Swap(tmp2);
+        Swap(tmp);
         return S_OK;
     }
 
