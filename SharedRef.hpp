@@ -11,8 +11,17 @@
     References to this interface are weak, meaning they do not extend the lifetime of the object.
     Casting back to IUnknown and other interfaces only succeed if the object is still alive. */
 struct DECLSPEC_UUID("146532F9-763D-44C9-875A-7B5B732B9046")
-IWeakRef : public IUnknown {
+IWeakRef :
+#ifndef _WIN32
+    virtual
+#endif
+    public IUnknown {
 };
+#ifndef _WIN32
+static constexpr GUID IID_IWeakRef = { 0x146532F9, 0x763D, 0x44C9,{0x87,0x5A,0x7B,0x5B,0x73,0x2B,0x90,0x46} };
+DEFINE_UUIDOF(IWeakRef);
+#endif
+
 
 /** COM wrapper class that provides support for weak references through the IWeakRef interface. */
 class SharedRefBase : public IUnknown {
