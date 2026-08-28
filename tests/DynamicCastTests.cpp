@@ -2,11 +2,7 @@
 #include <AppAPI/ComSupport.hpp>
 
 struct DECLSPEC_UUID("672147B6-F19F-4F9D-A647-382F27756B78")
-IMyLogger :
-#ifndef _WIN32
-    virtual
-#endif
-    public IUnknown {
+IMyLogger : public IUnknown {
     virtual HRESULT Log(/*in*/BSTR msg) = 0;
 };
 #ifndef _WIN32

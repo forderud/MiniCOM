@@ -122,10 +122,7 @@ def ParseInterfaces (source):
         # rename 'interface' to 'struct'
         substr = substr.replace('interface', 'struct', 1)
         # add public inheritance
-        if "IUnknown" in substr:
-            return substr.replace(':', ': virtual public', 1) # virtual inheritance to match TlhFilePatch.py
-        else:
-            return substr.replace(':', ': public', 1)
+        return substr.replace(':', ': public', 1)
 
     # pattern to match 'interface ABC : IUnknown {'
     pattern = re.compile('interface\\s*[a-zA-Z0-9_]+?\\s*:\\s*[a-zA-Z0-9_]+\\s*{')
