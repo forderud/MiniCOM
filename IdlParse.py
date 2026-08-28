@@ -141,7 +141,7 @@ def ParseInterfaces (source):
         return substr
 
     # pattern to match 'HRESULT Fun (....);' method signatures
-    pattern2 = re.compile('HRESULT \\s*[a-zA-Z0-9_]+?\\s*\\(.*?\\)\\s*;')
+    pattern2 = re.compile('HRESULT \\s*[a-zA-Z0-9_]+?\\s*\\(.*?\\)\\s*;', re.DOTALL)
     source = pattern2.sub(ReplaceFun2, source)
             
     # pattern to match 'coclass ABC {...};'
