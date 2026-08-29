@@ -805,6 +805,12 @@ public:
         return CompareUnknown(p) == 0;
     }
 
+    template<typename U>
+    friend bool operator== (U* left, const _com_ptr_t& right) {
+        static_assert(std::is_base_of<IUnknown, U>::value, "_com_ptr_t::CompareUnknown: U must inherit from IUnknown");
+        return right == left;
+    }
+
     HRESULT CreateInstance (const GUID& clsid, IUnknown* outer = nullptr, DWORD context = CLSCTX_ALL) noexcept {
         _com_ptr_t tmp;
         HRESULT hr = ::CoCreateInstance(clsid, outer, context, __uuidof(T), (void**)&tmp);
