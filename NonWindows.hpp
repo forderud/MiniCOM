@@ -1224,20 +1224,23 @@ template <> unsigned int CComSafeArray<IUnknown*>::GetCount () const;
                                            static_assert(std::is_same_v<CLASS, std::remove_pointer_t<decltype(this)>>, \
                                                "Argument to BEGIN_COM_MAP doesn't match name of surrounding class."); \
                                            *obj = nullptr;
-
-#define COM_INTERFACE_ENTRY(INTERFACE) if (iid == __uuidof(INTERFACE)) \
+#define COM_INTERFACE_ENTRY(INTERFACE) if (iid == __uuidof(INTERFACE)) { \
                                            *obj = static_cast<INTERFACE*>(this); \
-                                       else
+                                           AddRef(); \
+                                           return S_OK; \
+                                       }
 #define COM_INTERFACE_ENTRY_AGGREGATE(INTERFACE, punk) \
-                                       if (iid == __uuidof(INTERFACE)) \
+                                       if (iid == __uuidof(INTERFACE)) { \
                                            *obj = static_cast<INTERFACE*>(&punk->m_contained); \
-                                       else
-#define END_COM_MAP()                  if (iid == __uuidof(IUnknown)) \
+                                           AddRef(); \
+                                           return S_OK; \
+                                       }
+#define END_COM_MAP()                  if (iid == __uuidof(IUnknown)) { \
                                            *obj = static_cast<IUnknown*>(this); \
-                                       else \
-                                           return E_NOINTERFACE; \
-                                       AddRef(); \
-                                       return S_OK; \
+                                           AddRef(); \
+                                           return S_OK; \
+                                       } \
+                                       return E_NOINTERFACE; \
                                      } \
                                      ULONG AddRef () override { \
                                          assert((m_ref < 0xFFFF) && "IUnknown::AddRef negative ref count."); \
