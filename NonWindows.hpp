@@ -1223,8 +1223,11 @@ template <> unsigned int CComSafeArray<IUnknown*>::GetCount () const;
 #define BEGIN_COM_MAP(CLASS)         HRESULT QueryInterface (const GUID & iid, /*out*/void **obj) override { \
                                            static_assert(std::is_same_v<CLASS, std::remove_pointer_t<decltype(this)>>, \
                                                "Argument to BEGIN_COM_MAP doesn't match name of surrounding class."); \
-                                           *obj = nullptr;
-#define COM_INTERFACE_ENTRY(INTERFACE) if (iid == __uuidof(INTERFACE)) { \
+                                           *obj = nullptr; \
+                                           IUnknown* this_unknown = nullptr;
+#define COM_INTERFACE_ENTRY(INTERFACE) if (!this_unknown) \
+                                           this_unknown = static_cast<IUnknown*>(static_cast<INTERFACE*>(this)); \
+                                       if (iid == __uuidof(INTERFACE)) { \
                                            *obj = static_cast<INTERFACE*>(this); \
                                            AddRef(); \
                                            return S_OK; \
@@ -1236,7 +1239,8 @@ template <> unsigned int CComSafeArray<IUnknown*>::GetCount () const;
                                            return S_OK; \
                                        }
 #define END_COM_MAP()                  if (iid == __uuidof(IUnknown)) { \
-                                           *obj = static_cast<IUnknown*>(this); \
+                                           assert(this_unknown && "COM_INTERFACE_ENTRY() entries missing"); \
+                                           *obj = this_unknown; \
                                            AddRef(); \
                                            return S_OK; \
                                        } \
