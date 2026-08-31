@@ -142,22 +142,34 @@ public:
     _com_error(HRESULT hr) : m_hr(hr) {
         const char* str = InternalHresultToString(hr);
 
+#ifdef _UNICODE
         size_t len = strlen(str);
         m_buffer.resize(len, L'\0');
         mbstowcs(const_cast<wchar_t*>(m_buffer.data()), str, len);
+#else
+        m_buffer = str;
+#endif
     }
 
     HRESULT Error() const noexcept {
         return m_hr;
     }
 
+#ifdef _UNICODE
     const wchar_t* ErrorMessage() const noexcept {
+#else
+    const char* ErrorMessage() const noexcept {
+#endif
         return m_buffer.c_str();
     }
 
 private:
     HRESULT      m_hr = E_FAIL;
+#ifdef _UNICODE
     std::wstring m_buffer;
+#else
+    std::string  m_buffer;
+#endif
 };
 
 
