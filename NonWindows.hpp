@@ -53,6 +53,11 @@ typedef unsigned int   ULONG;   ///< 32bit unsigned (cannot use 'long' since it'
 typedef int            LONG;    ///< 32bit int (cannot use 'long' since it can be 64bit)
 typedef short  VARIANT_BOOL;    ///< boolean type that's natively marshaled to C# and Python
 typedef wchar_t*       BSTR;    ///< zero terminated double-byte text string
+#ifdef _UNICODE
+typedef wchar_t        TCHAR;  ///< Win32 tchar.h: wchar_t when _UNICODE is set
+#else
+typedef char           TCHAR;  ///< Win32 tchar.h: char otherwise
+#endif
 typedef int32_t        HRESULT; ///< 32bit signed int (negative values indicate failure)
 typedef void*          HWND;    ///< window handle
 typedef unsigned long long  ULONGLONG; ///< 64bit unsigned
@@ -155,21 +160,14 @@ public:
         return m_hr;
     }
 
-#ifdef _UNICODE
-    const wchar_t* ErrorMessage() const noexcept {
-#else
-    const char* ErrorMessage() const noexcept {
-#endif
+    /** TCHAR string: wchar_t if _UNICODE, else char. Matches comdef.h. */
+    const TCHAR* ErrorMessage() const noexcept {
         return m_buffer.c_str();
     }
 
 private:
-    HRESULT      m_hr = E_FAIL;
-#ifdef _UNICODE
-    std::wstring m_buffer;
-#else
-    std::string  m_buffer;
-#endif
+    HRESULT m_hr = E_FAIL;
+    std::basic_string<TCHAR> m_buffer;
 };
 
 

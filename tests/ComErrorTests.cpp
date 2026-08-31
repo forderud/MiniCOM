@@ -8,8 +8,10 @@ static void CheckComErrorType(HRESULT hr1) {
     HRESULT hr2 = err.Error();
     EXPECT_EQ(hr1, hr2);
 
-    const wchar_t* msg = err.ErrorMessage();
-    EXPECT_TRUE(msg); // don't check string content, since it's not identical for Windows vs. other platforms
+    // ErrorMessage() is const TCHAR* (wchar_t if _UNICODE, else char), matching comdef.h.
+    // Don't check string content: Windows vs. other platforms do not use the same text.
+    const TCHAR* msg = err.ErrorMessage();
+    EXPECT_TRUE(msg);
 }
 
 TEST(ComErrorTests, Test_com_error) {
