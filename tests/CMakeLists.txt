@@ -28,6 +28,7 @@ set(TEST_SOURCES
     BooleanTests.cpp
     ComClassTests.cpp
     ComErrorTests.cpp
+    ComObjectTests.cpp
     ComPtrTests.cpp
     DynamicCastTests.cpp
     SafeArrayTests.cpp
@@ -35,7 +36,9 @@ set(TEST_SOURCES
     StringTests.cpp
     )
 if(NOT WIN32)
-    list(APPEND TEST_SOURCES "../NonWindows.cpp")
+    # ComCreateTests uses OBJECT_ENTRY_AUTO and IUnknownFactory, which are the
+    # non-Windows object-creation path. Windows uses ole32 and the registry.
+    list(APPEND TEST_SOURCES "../NonWindows.cpp" ComCreateTests.cpp)
 endif()
 
 set(IDL_INPUTS  "${CMAKE_CURRENT_SOURCE_DIR}/Example.idl")
