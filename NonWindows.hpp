@@ -628,9 +628,7 @@ private:
             if (FAILED(hr))
                 return hr;
 
-            tmp->AddRef(); // incr. ref-count to one
-            *obj = tmp;
-            return hr;
+            return tmp->QueryInterface(__uuidof(IUnknown), reinterpret_cast<void**>(obj)); // incr. ref-count to one
         } else {
             // create an object (with ref. count zero)
             CComObject<CLS> * tmp = nullptr;
@@ -638,9 +636,7 @@ private:
             if (FAILED(hr))
                 return hr;
 
-            tmp->AddRef(); // incr. ref-count to one
-            *obj = tmp;
-            return hr;
+            return tmp->QueryInterface(__uuidof(IUnknown), reinterpret_cast<void**>(obj)); // incr. ref-count to one
         }
     }
 
