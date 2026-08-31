@@ -8,6 +8,20 @@ set(CMAKE_CXX_STANDARD 17)
 # * MacOS: "brew install googletest"
 find_package(GTest REQUIRED)
 
+# compatibility function for parsing IDL files on non-Windows platforms
+function(process_idl_files INPUT_FILES OUTPUTS_FILES)
+    find_package(Python COMPONENTS Interpreter REQUIRED)
+
+    add_custom_command(
+        OUTPUT  ${OUTPUTS_FILES}
+        COMMAND ${Python_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/../IdlParse.py" ${INPUT_FILES}
+        DEPENDS ${INPUT_FILES}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        COMMENT "Processing IDL files..."
+    )
+endfunction()
+
+
 set(TEST_SOURCES
     Main.cpp
     AggregationTests.cpp
@@ -24,6 +38,10 @@ if(NOT WIN32)
     list(APPEND TEST_SOURCES "../NonWindows.cpp")
 endif()
 
+set(IDL_INPUTS  "${CMAKE_CURRENT_SOURCE_DIR}/Example.idl")
+set(IDL_OUTPUTS "${CMAKE_CURRENT_BINARY_DIR}/Example.h")
+
+
 add_definitions(-DUNICODE -D_UNICODE)
 
 add_executable(MiniCOM_tests ${TEST_SOURCES})
@@ -31,7 +49,13 @@ add_executable(MiniCOM_tests ${TEST_SOURCES})
 target_include_directories(MiniCOM_tests PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}/.."
+    "${CMAKE_CURRENT_BINARY_DIR}"
 )
+
+if(NOT WIN32)
+    process_idl_files("${IDL_INPUTS}" "${IDL_OUTPUTS}")
+    target_sources(MiniCOM_tests PRIVATE "${IDL_OUTPUTS}")
+endif()
 
 target_link_libraries(MiniCOM_tests PRIVATE GTest::gtest)
 
