@@ -2,12 +2,11 @@
 cd "$(dirname "$0")"
 set -e # stop on first failure
 
-# clean up
-rm -f a.out
+# Clean up
+rm -rf build
 
-# build test suite
-# This require GoogleTest ("gtest-devel" on Fedora)
-g++ -std=c++17 -I. -I.. -lgtest ../NonWindows.cpp Main.cpp AggregationTests.cpp BooleanTests.cpp ComClassTests.cpp ComErrorTests.cpp ComPtrTests.cpp DynamicCastTests.cpp SafeArrayTests.cpp SharedRefTests.cpp StringTests.cpp
+# Generate project files
+cmake -S . -B build
 
-# run test suite
-./a.out
+# Build & run tests
+cmake --build build
