@@ -161,22 +161,6 @@ def ParseUuidString (uuid):
     return uuid
 
 
-def MakeInterfacesPortable(source):
-    '''Use virtual interitance in unix to avoid duplicated IUnknown::m_ref member'''
-    new_source = []
-    for line in source:        
-        if ": IUnknown" in line:
-            # convert "IMyInterface : IUnknown" to "IMyInterface : virtual IUnknown"  on unix
-            new_source.append("#ifdef _WIN32\n")
-            new_source.append(line) # use as-is on windows
-            new_source.append("#else\n")
-            new_source.append(line.split()[0] + ": virtual IUnknown\n")
-            new_source.append("#endif\n")
-        else:
-            new_source.append(line)
-    
-    return new_source
-
 def MakeUUIDsPortable(source):
     '''Make __declspec(uuid("1881ea66-459d-44e8-868a-0923e41b5ba1")) annotation portable.'''
     interfaces = {}
@@ -278,7 +262,6 @@ def PatchTlhFile(tlh_file_in, tlh_file_out, tli_file_in, remove_header, cross_pl
     source = MakeTliIncludeRelative(source, tli_file_in)
     source = ReplaceStructs(source, cpp_content)
     if cross_platorm:
-        source = MakeInterfacesPortable(source)
         source = MakeUUIDsPortable(source)
         source = MakeEnumsPortable(source)
     

@@ -3,11 +3,7 @@
 
 
 struct DECLSPEC_UUID("672147B6-F19F-4F9D-A647-382F27756B78")
-IMyLogger :
-#ifndef _WIN32
-    virtual
-#endif
-    public IUnknown {
+IMyLogger : public IUnknown {
     virtual HRESULT Log(/*in*/BSTR msg) = 0;
 };
 #ifndef _WIN32
@@ -16,11 +12,7 @@ DEFINE_UUIDOF(IMyLogger);
 #endif
 
 struct DECLSPEC_UUID("A768B57D-63A0-49FE-98DD-43CF98D2D2A7")
-IMyMessage :
-#ifndef _WIN32
-    virtual
-#endif
-    public IUnknown {
+IMyMessage : public IUnknown {
     virtual HRESULT ShowMessage(/*in*/BSTR msg) = 0;
 };
 #ifndef _WIN32
