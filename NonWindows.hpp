@@ -781,10 +781,34 @@ public:
         return m_ptr;
     }
 
+    bool operator==(const _com_ptr_t& p) const {
+        if (m_ptr == p.m_ptr)
+            return true;
+
+        return CompareUnknown(p.m_ptr) == 0;
+    }
+
+    template<typename U, ::std::enable_if_t<!::std::is_same<U, T>::value, int> = 0>
+    bool operator==(const _com_ptr_t<U>& other) {
+        U* other_ptr = other; // cannot access other.m_ptr member directly, since it's private
+        return CompareUnknown(other_ptr) == 0;
+    }
+
     bool operator==(T* p) const {
         if (m_ptr == p)
             return true;
         return CompareUnknown(p) == 0;
+    }
+
+    template<typename U, ::std::enable_if_t<!::std::is_same<U, T>::value, int> = 0>
+    bool operator==(U* p) const {
+        return CompareUnknown(p) == 0;
+    }
+
+    template<typename U>
+    friend bool operator== (U* left, const _com_ptr_t& right) {
+        static_assert(std::is_base_of<IUnknown, U>::value, "_com_ptr_t::CompareUnknown: U must inherit from IUnknown");
+        return right == left;
     }
 
     HRESULT CreateInstance (const GUID& clsid, IUnknown* outer = nullptr, DWORD context = CLSCTX_ALL) noexcept {
@@ -824,8 +848,9 @@ private:
         other.m_ptr = tmp;
     }
 
-    ptrdiff_t CompareUnknown(T * p) const {
-        static_assert(std::is_base_of<IUnknown, T>::value, "_com_ptr_t::CompareUnknown: T must inherit from IUnknown");
+    template<typename U>
+    ptrdiff_t CompareUnknown(U * p) const {
+        static_assert(std::is_base_of<IUnknown, U>::value, "_com_ptr_t::CompareUnknown: U must inherit from IUnknown");
 
         IUnknown* pu1 = nullptr;
         IUnknown* pu2 = nullptr;

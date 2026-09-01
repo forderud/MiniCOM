@@ -116,8 +116,6 @@ TEST(SharedRefTests, Test_SharedRef_Comparison)
     // test bool _com_ptr_t::operator==(T* p) const
     EXPECT_TRUE(unknownPtr == innerLogger);
 
-    // Will not work unless there is
-    // friend bool _com_ptr_t::operator==(T* p, const _com_ptr_t& _This)
-    // which is probably impossible, because for gcc and clang there is an ambiguity
-    // EXPECT_TRUE(innerLogger == unknownPtr);
+    // test bool _com_ptr_t::operator==(T* p, const _com_ptr_t& _This)
+    EXPECT_TRUE(innerLogger == unknownPtr);
 }
