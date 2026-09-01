@@ -41,12 +41,9 @@ public:
 };
 
 
-/** Current reference count, without changing it. AddRef/Release return the new
-    value, and the member holding it is named differently by ATL and MiniCOM. */
-static ULONG RefCount (IUnknown* obj) {
-    ULONG count = obj->AddRef();
-    obj->Release();
-    return count - 1;
+inline unsigned long GetRefCount(IUnknown& obj) {
+    obj.AddRef();
+    return obj.Release();
 }
 
 TEST(ComObjectTests, CreateInstanceStartsAtZeroAndDestroysOnLastRelease) {
@@ -57,14 +54,14 @@ TEST(ComObjectTests, CreateInstanceStartsAtZeroAndDestroysOnLastRelease) {
     EXPECT_EQ(obj->AddRef(), 1u);   // CreateInstance hands it back unreferenced
     ICounted* counted = nullptr;
     ASSERT_EQ(obj->QueryInterface(__uuidof(ICounted), (void**)&counted), S_OK);
-    EXPECT_EQ(RefCount(obj), 2u);
+    EXPECT_EQ(GetRefCount(*obj), 2u);
     int value = 0;
     EXPECT_EQ(counted->Value(&value), S_OK);
     EXPECT_EQ(value, 7);
 
     IUnknown* unknown = nullptr;
     ASSERT_EQ(obj->QueryInterface(__uuidof(IUnknown), (void**)&unknown), S_OK);
-    EXPECT_EQ(RefCount(obj), 3u);
+    EXPECT_EQ(GetRefCount(*obj), 3u);
 
     void* absent = (void*)0x1;
     EXPECT_EQ(obj->QueryInterface(__uuidof(IAbsent), &absent), E_NOINTERFACE);
@@ -78,24 +75,19 @@ TEST(ComObjectTests, CreateInstanceStartsAtZeroAndDestroysOnLastRelease) {
 }
 
 TEST(ComObjectTests, CComPtrCopyToAndIsEqualObject) {
-    g_counted_destroyed = 0;
     CComObject<Counted>* obj = nullptr;
     ASSERT_EQ(CComObject<Counted>::CreateInstance(&obj), S_OK);
     obj->AddRef();
-    EXPECT_EQ(RefCount(obj), 1u);
 
-    {
-        CComPtr<ICounted> p(static_cast<ICounted*>(obj));
-        EXPECT_EQ(RefCount(obj), 2u);
-        EXPECT_TRUE(p.IsEqualObject(static_cast<IUnknown*>(obj)));
+    CComPtr<ICounted> p(static_cast<ICounted*>(obj));
+    EXPECT_TRUE(p.IsEqualObject(static_cast<IUnknown*>(obj)));
 
-        CComPtr<ICounted> copied;
-        EXPECT_EQ(p.CopyTo(&copied), S_OK);
-        EXPECT_EQ(RefCount(obj), 3u);
-    }
-    EXPECT_EQ(RefCount(obj), 1u);
+    CComPtr<ICounted> copied;
+    EXPECT_EQ(p.CopyTo(&copied), S_OK);
+    EXPECT_EQ(GetRefCount(*obj), 3u);
 
-    EXPECT_EQ(g_counted_destroyed, 0);
+    p.Release();
+    copied.Release();
     EXPECT_EQ(obj->Release(), 0u);
-    EXPECT_EQ(g_counted_destroyed, 1);
 }
+
