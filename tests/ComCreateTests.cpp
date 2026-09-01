@@ -43,6 +43,19 @@ TEST(ComCreateTests, CoCreateInstanceReturnsRequestedInterface) {
     EXPECT_EQ(value, 42);
 }
 
+TEST(ComCreateTests, ComPtrCreateInstance) {
+    // the other smart pointer's creation path
+    _COM_SMARTPTR_TYPEDEF(IExample, __uuidof(IExample));
+    IExamplePtr example;
+    ASSERT_EQ(example.CreateInstance(CLSID_Example), S_OK);
+
+    int value = 0;
+    EXPECT_EQ(example->GetValue(&value), S_OK);
+    EXPECT_EQ(value, 42);
+
+    EXPECT_EQ(example.CreateInstance(L"Example"), S_OK);
+}
+
 TEST(ComCreateTests, CoCreateInstanceByProgID) {
     CComPtr<IExample> example;
     ASSERT_EQ(example.CoCreateInstance(L"Example"), S_OK);
