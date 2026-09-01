@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD 17)
 # * Fedora: "dnf install gtest-devel"
 # * MacOS: "brew install googletest"
 find_package(GTest REQUIRED)
+include(GoogleTest)
 
 set(TEST_SOURCES
     Main.cpp
@@ -35,8 +36,5 @@ target_include_directories(MiniCOM_tests PRIVATE
 
 target_link_libraries(MiniCOM_tests PRIVATE GTest::gtest)
 
-# run test suite as post-build event
-add_custom_command(TARGET MiniCOM_tests POST_BUILD
-                   COMMAND $<TARGET_FILE:MiniCOM_tests>
-                   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-                   COMMENT "Running test suite")
+enable_testing()
+gtest_discover_tests(MiniCOM_tests WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")

@@ -10,3 +10,4 @@ cmake -S . -B build
 
 # Build & run tests
 cmake --build build
+cd build && ctest --output-on-failure
