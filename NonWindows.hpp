@@ -388,14 +388,14 @@ struct IUnknown {
     IUnknown () {
     }
 
-    virtual ~IUnknown() {
+    /*not virtual*/ ~IUnknown() {
     }
 
     /** Cast method. */
     virtual HRESULT QueryInterface (const GUID & iid, /*[out]*/void **obj) = 0;
 
+    /** Reference counting for lifetime management. */
     virtual ULONG AddRef () = 0;
-
     virtual ULONG Release () = 0;
 };
 } // extern "C"
