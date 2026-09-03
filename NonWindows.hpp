@@ -383,14 +383,8 @@ extern "C" {
 static constexpr GUID IID_IUnknown       = {0x00000000,0x0000,0x0000,{0xC0,0x00,0x00,0x00,0x00,0x00,0x00,0x46}};
 static constexpr GUID IID_IMessageFilter = {0x00000016,0x0000,0x0000,{0xC0,0x00,0x00,0x00,0x00,0x00,0x00,0x46}};
 
-/** IUnknown base-class for Non-Windows platforms. */
+/** IUnknown base-class for non-Windows platforms. */
 struct IUnknown {
-    IUnknown () {
-    }
-
-    /*not virtual*/ ~IUnknown() {
-    }
-
     /** Cast method. */
     virtual HRESULT QueryInterface (const GUID & iid, /*[out]*/void **obj) = 0;
 
