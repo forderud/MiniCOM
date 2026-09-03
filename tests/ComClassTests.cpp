@@ -98,3 +98,10 @@ TEST(ComClassTests, TestTemplatedLogger) {
     logger = CreateLocalInstance<TemplatedLogger<int>>();
     logger->Log(CComBSTR(L"Hi TemplatedLogger"));
 }
+
+TEST(ComClassTests, QueryInterfaceRejectsNullOutPointer) {
+    CComPtr<IMyLogger> logger;
+    logger = CreateLocalInstance<SimpleLogger>();
+
+    EXPECT_EQ(logger->QueryInterface(__uuidof(IMyLogger), nullptr), E_POINTER);
+}

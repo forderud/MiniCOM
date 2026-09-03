@@ -472,6 +472,8 @@ public:
         return ref;
     }
     HRESULT QueryInterface (const GUID & iid, /*out*/void **obj) override {
+        if (!obj)
+            return E_POINTER;
         if (iid == __uuidof(IUnknown)) {
             // special handling of IUnknown
             *obj = static_cast<IUnknown*>(this);
@@ -1242,6 +1244,8 @@ template <> unsigned int CComSafeArray<IUnknown*>::GetCount () const;
 #define BEGIN_COM_MAP(CLASS)         HRESULT QueryInterface (const GUID & iid, /*out*/void **obj) override { \
                                            static_assert(std::is_same_v<CLASS, std::remove_pointer_t<decltype(this)>>, \
                                                "Argument to BEGIN_COM_MAP doesn't match name of surrounding class."); \
+                                           if (!obj) \
+                                               return E_POINTER; \
                                            *obj = nullptr; \
                                            IUnknown* this_unknown = nullptr;
 #define COM_INTERFACE_ENTRY(INTERFACE) if (!this_unknown) \
