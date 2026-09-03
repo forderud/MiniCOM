@@ -80,3 +80,22 @@ TEST(ComCreateTests, UnregisteredClassAndInterfaceErrors) {
     EXPECT_EQ(missing.CoCreateInstance(CLSID_Example), E_NOINTERFACE);
     EXPECT_FALSE(missing);
 }
+
+TEST(ComCreateTests, ComPtrCreateInstanceErrors) {
+    // same error paths as CComPtr, through _com_ptr_t instead
+    _COM_SMARTPTR_TYPEDEF(IUnknown, __uuidof(IUnknown));
+    _COM_SMARTPTR_TYPEDEF(IMissing, __uuidof(IMissing));
+
+    GUID unknown_clsid = {0xDEADBEEF, 0x0000, 0x0000, {0, 0, 0, 0, 0, 0, 0, 0}};
+    IUnknownPtr obj;
+    EXPECT_EQ(obj.CreateInstance(unknown_clsid), REGDB_E_CLASSNOTREG);
+    EXPECT_FALSE(obj);
+
+    IUnknownPtr by_name;
+    EXPECT_EQ(by_name.CreateInstance(L"NoSuchClass"), CO_E_CLASSSTRING);
+    EXPECT_FALSE(by_name);
+
+    IMissingPtr missing;
+    EXPECT_EQ(missing.CreateInstance(CLSID_Example), E_NOINTERFACE);
+    EXPECT_FALSE(missing);
+}
