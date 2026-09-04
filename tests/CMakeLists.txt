@@ -30,6 +30,7 @@ set(TEST_SOURCES
     ComErrorTests.cpp
     ComPtrTests.cpp
     DynamicCastTests.cpp
+    ExampleTests.cpp
     SafeArrayTests.cpp
     SharedRefTests.cpp
     StringTests.cpp
