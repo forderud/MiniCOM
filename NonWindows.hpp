@@ -413,6 +413,12 @@ inline void _com_issue_errorex(HRESULT hr, IUnknown*, const IID &) {
 template <class BASE>
 class CComObject : public BASE {
 public:
+    CComObject() {
+        static_assert(sizeof(*this) == sizeof(BASE)); // ensure it's safe to delete a BASE pointer without leaking memory
+    }
+
+    /* NO destructor here, since it's not guaranteed to be called. */
+
     static HRESULT CreateInstance (CComObject<BASE> ** arg) {
         assert(arg);
         assert(!*arg);
