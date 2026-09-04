@@ -383,19 +383,13 @@ extern "C" {
 static constexpr GUID IID_IUnknown       = {0x00000000,0x0000,0x0000,{0xC0,0x00,0x00,0x00,0x00,0x00,0x00,0x46}};
 static constexpr GUID IID_IMessageFilter = {0x00000016,0x0000,0x0000,{0xC0,0x00,0x00,0x00,0x00,0x00,0x00,0x46}};
 
-/** IUnknown base-class for Non-Windows platforms. */
+/** IUnknown base-class for non-Windows platforms. */
 struct IUnknown {
-    IUnknown () {
-    }
-
-    virtual ~IUnknown() {
-    }
-
     /** Cast method. */
     virtual HRESULT QueryInterface (const GUID & iid, /*[out]*/void **obj) = 0;
 
+    /** Reference counting for lifetime management. */
     virtual ULONG AddRef () = 0;
-
     virtual ULONG Release () = 0;
 };
 } // extern "C"
