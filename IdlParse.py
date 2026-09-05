@@ -242,6 +242,103 @@ def ParseImport (source):
     return source, last_import
 
 
+def SplitParameters (arglist):
+    '''Split a C++ parameter list on top-level commas.'''
+    params, depth, current = [], 0, ''
+    for ch in arglist:
+        if ch in '([<':
+            depth += 1
+        elif ch in ')]>':
+            depth -= 1
+        if ch == ',' and depth == 0:
+            params.append(current)
+            current = ''
+        else:
+            current += ch
+    if current.strip():
+        params.append(current)
+    return [p.strip() for p in params if p.strip()]
+
+
+def ParseInterfaceBodies (source):
+    '''Return [(name, base, [(method, arglist), ...]), ...] in declaration order.
+
+    Reads the already-rewritten C++ text, where interfaces have become
+    "struct IFoo : public IBar {" and methods "virtual HRESULT Fun (...) = 0;".
+    '''
+    result = []
+    header = re.compile('struct\\s+([a-zA-Z0-9_]+)\\s*:\\s*public\\s+([a-zA-Z0-9_]+)\\s*{')
+    method = re.compile('virtual\\s+HRESULT\\s+([a-zA-Z0-9_]+)\\s*\\((.*?)\\)\\s*=\\s*0\\s*;', re.DOTALL)
+
+    for match in header.finditer(source):
+        # find the matching close brace
+        depth, idx = 1, match.end()
+        while depth > 0 and idx < len(source):
+            if source[idx] == '{':
+                depth += 1
+            elif source[idx] == '}':
+                depth -= 1
+            idx += 1
+        body = source[match.end():idx-1]
+        methods = [(m.group(1), m.group(2)) for m in method.finditer(body)]
+        result.append((match.group(1), match.group(2), methods))
+    return result
+
+
+def GenerateVtables (source):
+    '''Emit the vtable layout of each interface as a struct of function pointers.
+
+    Same shape as what MIDL emits for C clients: IUnknown first, then inherited
+    methods, then the ones declared on the interface itself, each taking the
+    interface pointer as its first argument. This matches the vtable the C++
+    compiler builds for the same interface, so a caller that cannot declare a
+    C++ class -- Python through ctypes, C# through P/Invoke -- can walk an
+    object vtable instead of reproducing the layout by hand.
+    '''
+    interfaces = ParseInterfaceBodies(source)
+    methods_of = {name: methods for name, _, methods in interfaces}
+    base_of    = {name: base for name, base, _ in interfaces}
+
+    def AllMethods (name):
+        '''Own methods, preceded by every inherited one, in vtable order.'''
+        base = base_of.get(name)
+        inherited = AllMethods(base) if base and base != 'IUnknown' else []
+        return inherited + methods_of.get(name, [])
+
+    def BaseIsVisible (name):
+        base = base_of.get(name)
+        if not base or base == 'IUnknown':
+            return True
+        return base in methods_of and BaseIsVisible(base)
+
+    out = '\n\n/* Vtable layout of each interface, in the same shape MIDL emits for C\n'
+    out += '   clients: IUnknown first, then inherited methods, then the ones declared\n'
+    out += '   on the interface itself. Matches the vtable built by the C++ compiler. */\n'
+
+    for name, _, _ in interfaces:
+        if not BaseIsVisible(name):
+            # Inheriting from an interface declared in an imported IDL file,
+            # which this run cannot see, so the inherited methods are unknown
+            # and the vtable cannot be laid out.
+            out += '\n/* no vtable for '+name+': it inherits from '
+            out += base_of.get(name)+', declared in another IDL file. */\n'
+            continue
+
+        methods = AllMethods(name)
+        out += '\ntypedef struct '+name+'Vtbl {\n'
+        out += '    HRESULT (STDMETHODCALLTYPE *QueryInterface) ('+name+'* This, const GUID& iid, void** obj);\n'
+        out += '    ULONG (STDMETHODCALLTYPE *AddRef) ('+name+'* This);\n'
+        out += '    ULONG (STDMETHODCALLTYPE *Release) ('+name+'* This);\n'
+        for method, arglist in methods:
+            params = SplitParameters(arglist)
+            out += '    HRESULT (STDMETHODCALLTYPE *'+method+') ('+name+'* This'
+            out += ''.join(', '+p for p in params)+');\n'
+        out += '} '+name+'Vtbl;\n'
+        out += 'static_assert(sizeof('+name+'Vtbl) == '+str(3+len(methods))+'*sizeof(void*), "unexpected '+name+'Vtbl layout");\n'
+
+    return out
+
+
 def ParseIdlFile (idl_file, h_file, c_file):
     with open(idl_file, 'r') as f:
         source = f.read()
@@ -254,10 +351,11 @@ def ParseIdlFile (idl_file, h_file, c_file):
     source, interfaces = ParseAttributes(source)
     source = ParseInterfaces(source)
     source = ParseSafeArray(source)
+    vtables = GenerateVtables(source)
     source = ReplaceComments(source, comments)
     source, last_import = ParseImport(source)
     source = ParseCppQuote(source)
-        
+
     #print(source)
     with open(h_file, 'w') as f:
         f.write('#pragma once\n')
@@ -267,6 +365,7 @@ def ParseIdlFile (idl_file, h_file, c_file):
         f.write('} //extern "C"\n')
         for interface in interfaces:
             f.write('DEFINE_UUIDOF('+interface+')\n')
+        f.write(vtables)
     
     with open(c_file, 'w') as f:
         f.write('#include "'+h_file+'"\n')
