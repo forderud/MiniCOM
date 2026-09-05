@@ -27,6 +27,24 @@ There's no point in supporting Windows, since the same functionality is already 
 
 Contributions for addressing missing features are welcome.
 
+## Vtable layouts
+
+`IdlParse.py` also emits, per interface, a struct describing that interface's vtable, in the shape MIDL emits for C clients. For `ICalcExt` in `tests/Example.idl`, which extends `ICalc`:
+
+```cpp
+typedef struct ICalcExtVtbl {
+    HRESULT (STDMETHODCALLTYPE *QueryInterface) (ICalcExt* This, const GUID& iid, void** obj);
+    ULONG (STDMETHODCALLTYPE *AddRef) (ICalcExt* This);
+    ULONG (STDMETHODCALLTYPE *Release) (ICalcExt* This);
+    HRESULT (STDMETHODCALLTYPE *GetValue) (ICalcExt* This, int * value);   // inherited from ICalc
+    HRESULT (STDMETHODCALLTYPE *Add) (ICalcExt* This, int a, int b, int * result);
+} ICalcExtVtbl;
+```
+
+This matches the vtable the C++ compiler builds for `ICalcExt`, so reading an object's vtable pointer and calling through this struct reaches the same implementations. That is what a caller that cannot declare a C++ class — Python through ctypes, C# through P/Invoke — otherwise has to reconstruct by hand. `tests/VtableTests.cpp` checks the two against each other.
+
+The layouts agree because these interfaces use single inheritance and `IUnknown` has no virtual destructor, so the three `IUnknown` slots come first on either platform.
+
 ## Shared & weak references
 The repo also contains a [`SharedRef`](SharedRef.hpp) wrapper class for non-owning weak references through a `IWeakRef` interface. This is similar to [`IWeakReference`](https://learn.microsoft.com/en-us/windows/win32/api/weakreference/nn-weakreference-iweakreference), but is also compatible with classical `IUnknown`-based COM.
 
