@@ -36,7 +36,8 @@ set(TEST_SOURCES
     StringTests.cpp
     )
 if(NOT WIN32)
-    list(APPEND TEST_SOURCES "../NonWindows.cpp")
+    # VtableTests uses the vtable structs from IdlParse.py, which MIDL doesn't emit for C++
+    list(APPEND TEST_SOURCES "../NonWindows.cpp" VtableTests.cpp)
 endif()
 
 set(IDL_INPUTS  "${CMAKE_CURRENT_SOURCE_DIR}/Example.idl")
