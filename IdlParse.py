@@ -242,6 +242,106 @@ def ParseImport (source):
     return source, last_import
 
 
+def SplitParameters (arglist):
+    '''Split a C++ parameter list on top-level commas.'''
+    params, depth, current = [], 0, ''
+    for ch in arglist:
+        if ch in '([<':
+            depth += 1
+        elif ch in ')]>':
+            depth -= 1
+        if ch == ',' and depth == 0:
+            params.append(current)
+            current = ''
+        else:
+            current += ch
+    if current.strip():
+        params.append(current)
+    return [p.strip() for p in params if p.strip()]
+
+
+def ParseInterfaces2 (source):
+    '''Return [(name, base, methods, begin, end), ...] for each interface struct.
+
+    Reads the already-rewritten C++ text, where interfaces have become
+    "struct IFoo : public IBar {" and methods "virtual HRESULT Fun (...) = 0;".
+    "begin" and "end" delimit the whole struct, including the trailing ";".
+    '''
+    result = []
+    header = re.compile('struct\\s+([a-zA-Z0-9_]+)\\s*:\\s*public\\s+([a-zA-Z0-9_]+)\\s*{')
+    method = re.compile('virtual\\s+HRESULT\\s+([a-zA-Z0-9_]+)\\s*\\((.*?)\\)\\s*=\\s*0\\s*;', re.DOTALL)
+
+    for match in header.finditer(source):
+        # find the matching close brace
+        depth, idx = 1, match.end()
+        while depth > 0 and idx < len(source):
+            if source[idx] == '{':
+                depth += 1
+            elif source[idx] == '}':
+                depth -= 1
+            idx += 1
+        body = source[match.end():idx-1]
+        while idx < len(source) and source[idx] != ';':
+            idx += 1
+        methods = [(m.group(1), m.group(2)) for m in method.finditer(body)]
+        result.append((match.group(1), match.group(2), methods, match.start(), idx+1))
+    return result
+
+
+def GenerateCInterfaces (source):
+    '''Add C-style vtable definitions next to the C++ interface definitions.
+
+    Mirrors what MIDL generates: the C++ interface when compiling C++, and a
+    vtable struct plus an "lpVtbl" object when CINTERFACE is defined. Both
+    describe the same vtable, so a client can pick whichever form suits it.
+    '''
+    interfaces = ParseInterfaces2(source)
+    methods_of = {name: methods for name, _, methods, _, _ in interfaces}
+    base_of    = {name: base for name, base, _, _, _ in interfaces}
+
+    def AllMethods (name):
+        '''Own methods, preceded by every inherited one, in vtable order.'''
+        base = base_of.get(name)
+        inherited = AllMethods(base) if base and base != 'IUnknown' else []
+        return inherited+methods_of.get(name, [])
+
+    def BaseIsVisible (name):
+        base = base_of.get(name)
+        if not base or base == 'IUnknown':
+            return True
+        return base in methods_of and BaseIsVisible(base)
+
+    # back to front, so that the offsets of earlier interfaces still apply
+    for name, base, _, begin, end in reversed(interfaces):
+        if not BaseIsVisible(name):
+            # Inherits from an interface declared in an imported IDL file, so
+            # the inherited methods are unknown and the vtable is incomplete.
+            continue
+
+        vtbl = ''
+        vtbl += '#if defined(__cplusplus) && !defined(CINTERFACE)\n'
+        vtbl += source[begin:end]
+        vtbl += '\n#else /* C style interface */\n'
+        vtbl += 'struct '+name+';\n\n'
+        vtbl += 'typedef struct '+name+'Vtbl {\n'
+        vtbl += '    HRESULT (STDMETHODCALLTYPE *QueryInterface) ('+name+'* This, const IID& riid, void** ppvObject);\n'
+        vtbl += '    ULONG (STDMETHODCALLTYPE *AddRef) ('+name+'* This);\n'
+        vtbl += '    ULONG (STDMETHODCALLTYPE *Release) ('+name+'* This);\n'
+        for method, arglist in AllMethods(name):
+            params = SplitParameters(arglist)
+            vtbl += '    HRESULT (STDMETHODCALLTYPE *'+method+') ('+name+'* This'
+            vtbl += ''.join(', '+p for p in params)+');\n'
+        vtbl += '} '+name+'Vtbl;\n\n'
+        vtbl += 'struct '+name+' {\n'
+        vtbl += '    CONST_VTBL struct '+name+'Vtbl* lpVtbl;\n'
+        vtbl += '};\n'
+        vtbl += '#endif\n'
+
+        source = source[:begin]+vtbl+source[end:]
+
+    return source
+
+
 def ParseIdlFile (idl_file, h_file, c_file):
     with open(idl_file, 'r') as f:
         source = f.read()
@@ -254,6 +354,7 @@ def ParseIdlFile (idl_file, h_file, c_file):
     source, interfaces = ParseAttributes(source)
     source = ParseInterfaces(source)
     source = ParseSafeArray(source)
+    source = GenerateCInterfaces(source)
     source = ReplaceComments(source, comments)
     source, last_import = ParseImport(source)
     source = ParseCppQuote(source)

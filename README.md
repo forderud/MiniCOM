@@ -27,6 +27,20 @@ There's no point in supporting Windows, since the same functionality is already 
 
 Contributions for addressing missing features are welcome.
 
+## C-style vtable access
+
+`IdlParse.py` generates both interface forms that MIDL does: the C++ interface by default, and a vtable struct with an `lpVtbl` object when `CINTERFACE` is defined before including the generated header.
+
+```cpp
+#define CINTERFACE
+#include "Example.h"
+
+int val = 0;
+HRESULT hr = ptr->lpVtbl->GetValue(ptr, &val);
+```
+
+`NonWindows.hpp` provides `IUnknown` in the same two forms. The ATL emulation calls `IUnknown` through its C++ interface, so it is only available to translation units using that form — mirroring Windows, where a `CINTERFACE` translation unit gets `unknwn.h` but never the ATL headers.
+
 ## Shared & weak references
 The repo also contains a [`SharedRef`](SharedRef.hpp) wrapper class for non-owning weak references through a `IWeakRef` interface. This is similar to [`IWeakReference`](https://learn.microsoft.com/en-us/windows/win32/api/weakreference/nn-weakreference-iweakreference), but is also compatible with classical `IUnknown`-based COM.
 
