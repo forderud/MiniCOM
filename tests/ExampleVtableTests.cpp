@@ -22,6 +22,12 @@ static void TestQueryInterface(INTERFACE* ptr) {
     HRESULT hr = ptr->lpVtbl->QueryInterface(ptr, IID_IUnknown, (void**)&unknown);
     EXPECT_EQ(hr, S_OK);
 
+    // cast again, through the IUnknown vtable this time
+    IUnknown* unknown2 = nullptr;
+    hr = unknown->lpVtbl->QueryInterface(unknown, IID_IUnknown, (void**)&unknown2);
+    EXPECT_EQ(hr, S_OK);
+    unknown2->lpVtbl->Release(unknown2);
+
     // clean up reference
     unknown->lpVtbl->Release(unknown);
 }
