@@ -6,7 +6,6 @@
 #include <gtest/gtest.h>
 
 
-#ifdef _WIN32
 template <class IUNKNOWN>
 static void TestAddRefRelease(IUNKNOWN* ptr) {
     ULONG ref1 = ptr->lpVtbl->AddRef(ptr);
@@ -26,7 +25,6 @@ static void TestQueryInterface(INTERFACE* ptr) {
     // clean up reference
     unknown->lpVtbl->Release(unknown);
 }
-#endif
 
 
 void TestICalcVtable(ICalc* ptr) {
