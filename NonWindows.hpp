@@ -378,6 +378,8 @@ class CComPtr;
 template<typename T>
 class _com_ptr_t;
 
+#if !defined(CINTERFACE)
+
 extern "C" {
 // interface ID values for well-known interfaces
 static constexpr GUID IID_IUnknown       = {0x00000000,0x0000,0x0000,{0xC0,0x00,0x00,0x00,0x00,0x00,0x00,0x46}};
@@ -395,6 +397,22 @@ struct IUnknown {
 } // extern "C"
 DEFINE_UUIDOF(IUnknown)
 
+#else // defined(CINTERFACE)
+
+struct IUnknown; // forward declaration
+
+typedef struct IUnknownVtbl {
+    HRESULT (*QueryInterface)(IUnknown* This, const GUID* iid, void** obj);    
+    ULONG   (*AddRef)(IUnknown* This);
+    ULONG   (*Release)(IUnknown* This);
+} IUnknownVtbl;
+
+struct IUnknown {
+    struct IUnknownVtbl* lpVtbl;
+};
+
+#endif
+
 
 /** Resolve COM class CLSID based on "[<Program>.]<Component>[.<Version>]" ProgID string. */
 extern "C" // to avoid name mangling
@@ -409,6 +427,9 @@ HRESULT CoCreateInstance (const GUID& clsid, IUnknown* outer, DWORD context, con
 inline void _com_issue_errorex(HRESULT hr, IUnknown*, const IID &) {
     throw _com_error(hr);
 }
+
+
+#if !defined(CINTERFACE)
 
 template <class BASE>
 class CComObject : public BASE {
@@ -1314,3 +1335,5 @@ class CComCoClass {
 #ifndef _ATL_NO_AUTOMATIC_NAMESPACE
   using namespace ATL;
 #endif
+
+#endif // !defined(CINTERFACE)
