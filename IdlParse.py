@@ -260,7 +260,7 @@ def SplitParameters (arglist):
     return [p.strip() for p in params if p.strip()]
 
 
-def ParseInterfaces2 (source):
+def FindInterfaceDefinitions (source):
     '''Return [(name, base, methods, begin, end), ...] for each interface struct.
 
     Reads the already-rewritten C++ text, where interfaces have become
@@ -295,7 +295,7 @@ def GenerateCInterfaces (source):
     vtable struct plus an "lpVtbl" object when CINTERFACE is defined. Both
     describe the same vtable, so a client can pick whichever form suits it.
     '''
-    interfaces = ParseInterfaces2(source)
+    interfaces = FindInterfaceDefinitions(source)
     methods_of = {name: methods for name, _, methods, _, _ in interfaces}
     base_of    = {name: base for name, base, _, _, _ in interfaces}
 

@@ -44,12 +44,9 @@ static GUID hold_uuidof () = delete; // fail build if performing __uuidof() on u
 #define __uuidof(Q) hold_uuidof<Q>()
 
 typedef GUID           IID;
-typedef GUID           CLSID;
 
-// GUID reference types, matching guiddef.h
-#define REFGUID  const GUID &
-#define REFIID   const IID &
-#define REFCLSID const CLSID &
+// GUID reference type, matching guiddef.h
+#define REFIID const IID &
 
 typedef unsigned int   DWORD;   ///< 32bit unsigned
 typedef long           BOOL;
@@ -426,11 +423,6 @@ struct IUnknown {
 } // extern "C"
 DEFINE_UUIDOF(IUnknown)
 
-#ifndef CINTERFACE
-/* The ATL emulation below calls IUnknown through its C++ interface, so it is
-   only available to translation units using that form. This mirrors Windows,
-   where a CINTERFACE translation unit gets unknwn.h but never the ATL headers. */
-
 /** Resolve COM class CLSID based on "[<Program>.]<Component>[.<Version>]" ProgID string. */
 extern "C" // to avoid name mangling
 HRESULT CLSIDFromProgID (const wchar_t* ProgID, /*out*/GUID* clsid);
@@ -438,6 +430,11 @@ HRESULT CLSIDFromProgID (const wchar_t* ProgID, /*out*/GUID* clsid);
 /** Create COM class based on CLSID. */
 extern "C" // to avoid name mangling
 HRESULT CoCreateInstance (const GUID& clsid, IUnknown* outer, DWORD context, const GUID& iid, /*out*/void** result);
+
+#ifndef CINTERFACE
+/* The ATL emulation below calls IUnknown through its C++ interface, so it is
+   only available to translation units using that form. This mirrors Windows,
+   where a CINTERFACE translation unit gets unknwn.h but never the ATL headers. */
 
 
 // error handler required by generated wrapper API headers
