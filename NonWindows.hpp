@@ -405,7 +405,7 @@ DEFINE_UUIDOF(IUnknown)
 struct IUnknown; // forward declaration
 
 typedef struct IUnknownVtbl {
-    HRESULT (*QueryInterface)(IUnknown* This, const GUID* iid, void** obj);    
+    HRESULT (*QueryInterface)(IUnknown* This, const GUID& iid, void** obj);
     ULONG   (*AddRef)(IUnknown* This);
     ULONG   (*Release)(IUnknown* This);
 } IUnknownVtbl;
