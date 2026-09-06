@@ -322,15 +322,16 @@ def GenerateCInterfaces (source):
         vtbl += '#if defined(__cplusplus) && !defined(CINTERFACE)\n'
         vtbl += source[begin:end]
         vtbl += '\n#else /* C style interface */\n'
-        vtbl += 'struct '+name+';\n\n'
         vtbl += 'typedef struct '+name+'Vtbl {\n'
-        vtbl += '    HRESULT (STDMETHODCALLTYPE *QueryInterface) ('+name+'* This, const IID& riid, void** ppvObject);\n'
+        vtbl += '    BEGIN_INTERFACE\n'
+        vtbl += '    HRESULT (STDMETHODCALLTYPE *QueryInterface) ('+name+'* This, REFIID riid, void** ppvObject);\n'
         vtbl += '    ULONG (STDMETHODCALLTYPE *AddRef) ('+name+'* This);\n'
         vtbl += '    ULONG (STDMETHODCALLTYPE *Release) ('+name+'* This);\n'
         for method, arglist in AllMethods(name):
             params = SplitParameters(arglist)
             vtbl += '    HRESULT (STDMETHODCALLTYPE *'+method+') ('+name+'* This'
             vtbl += ''.join(', '+p for p in params)+');\n'
+        vtbl += '    END_INTERFACE\n'
         vtbl += '} '+name+'Vtbl;\n\n'
         vtbl += 'struct '+name+' {\n'
         vtbl += '    CONST_VTBL struct '+name+'Vtbl* lpVtbl;\n'
@@ -340,6 +341,21 @@ def GenerateCInterfaces (source):
         source = source[:begin]+vtbl+source[end:]
 
     return source
+
+
+def GenerateForwardDeclarations (interfaces):
+    '''Forward declare every interface, the way MIDL does.
+
+    Lets an interface refer to one that is declared further down the file, and
+    lets generated headers refer to each other, without depending on order.
+    '''
+    out = ''
+    for name in interfaces:
+        out += '#ifndef __'+name+'_FWD_DEFINED__\n'
+        out += '#define __'+name+'_FWD_DEFINED__\n'
+        out += 'typedef struct '+name+' '+name+';\n'
+        out += '#endif\n\n'
+    return out
 
 
 def ParseIdlFile (idl_file, h_file, c_file):
@@ -364,6 +380,7 @@ def ParseIdlFile (idl_file, h_file, c_file):
         f.write('#pragma once\n')
         f.write(source[:last_import]+'\n')
         f.write('extern "C" {\n')
+        f.write(GenerateForwardDeclarations(interfaces))
         f.write(source[last_import:]+'\n')
         f.write('} //extern "C"\n')
         for interface in interfaces:
