@@ -44,6 +44,13 @@ static GUID hold_uuidof () = delete; // fail build if performing __uuidof() on u
 #define __uuidof(Q) hold_uuidof<Q>()
 
 typedef GUID           IID;
+typedef GUID           CLSID;
+
+// GUID reference types, matching guiddef.h
+#define REFGUID  const GUID &
+#define REFIID   const IID &
+#define REFCLSID const CLSID &
+
 typedef unsigned int   DWORD;   ///< 32bit unsigned
 typedef long           BOOL;
 typedef unsigned char  BYTE;
@@ -381,8 +388,10 @@ class _com_ptr_t;
 // COM calling convention (use default on non-Windows)
 #define STDMETHODCALLTYPE
 
-// vtable pointer qualifier, matching rpcndr.h
+// vtable pointer qualifier and layout markers, matching rpcndr.h
 #define CONST_VTBL const
+#define BEGIN_INTERFACE
+#define END_INTERFACE
 
 extern "C" {
 // interface ID values for well-known interfaces
@@ -403,9 +412,11 @@ struct IUnknown {
 struct IUnknown;
 
 typedef struct IUnknownVtbl {
-    HRESULT (STDMETHODCALLTYPE *QueryInterface) (IUnknown* This, const IID& riid, void** ppvObject);
+    BEGIN_INTERFACE
+    HRESULT (STDMETHODCALLTYPE *QueryInterface) (IUnknown* This, REFIID riid, void** ppvObject);
     ULONG (STDMETHODCALLTYPE *AddRef) (IUnknown* This);
     ULONG (STDMETHODCALLTYPE *Release) (IUnknown* This);
+    END_INTERFACE
 } IUnknownVtbl;
 
 struct IUnknown {
