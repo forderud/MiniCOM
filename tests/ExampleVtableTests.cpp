@@ -6,7 +6,6 @@
 #include <gtest/gtest.h>
 
 
-#ifdef _WIN32
 template <class IUNKNOWN>
 static void TestAddRefRelease(IUNKNOWN* ptr) {
     ULONG ref1 = ptr->lpVtbl->AddRef(ptr);
@@ -26,11 +25,9 @@ static void TestQueryInterface(INTERFACE* ptr) {
     // clean up reference
     unknown->lpVtbl->Release(unknown);
 }
-#endif
 
 
 void TestICalcVtable(ICalc* ptr) {
-#ifdef _WIN32
     TestAddRefRelease(ptr);
     TestQueryInterface(ptr);
 
@@ -38,11 +35,9 @@ void TestICalcVtable(ICalc* ptr) {
     HRESULT hr = ptr->lpVtbl->GetValue(ptr, &val);
     EXPECT_EQ(hr, S_OK);
     EXPECT_EQ(val, 42);
-#endif
 }
 
 void TestICalcExtVtable(ICalcExt* ptr) {
-#ifdef _WIN32
     TestAddRefRelease(ptr);
     TestQueryInterface(ptr);
 
@@ -54,11 +49,9 @@ void TestICalcExtVtable(ICalcExt* ptr) {
     hr = ptr->lpVtbl->Add(ptr, 1, 2, &val);
     EXPECT_EQ(hr, S_OK);
     EXPECT_EQ(val, 3);
-#endif
 }
 
 void TestICalc2Vtable(ICalc2* ptr) {
-#ifdef _WIN32
     TestAddRefRelease(ptr);
     TestQueryInterface(ptr);
 
@@ -66,5 +59,4 @@ void TestICalc2Vtable(ICalc2* ptr) {
     HRESULT hr = ptr->lpVtbl->GetValue2(ptr, &val);
     EXPECT_EQ(hr, S_OK);
     EXPECT_EQ(val, 43);
-#endif
 }
