@@ -378,11 +378,18 @@ class CComPtr;
 template<typename T>
 class _com_ptr_t;
 
+// COM calling convention (use default on non-Windows)
+#define STDMETHODCALLTYPE
+
+// vtable pointer qualifier, matching rpcndr.h
+#define CONST_VTBL const
+
 extern "C" {
 // interface ID values for well-known interfaces
 static constexpr GUID IID_IUnknown       = {0x00000000,0x0000,0x0000,{0xC0,0x00,0x00,0x00,0x00,0x00,0x00,0x46}};
 static constexpr GUID IID_IMessageFilter = {0x00000016,0x0000,0x0000,{0xC0,0x00,0x00,0x00,0x00,0x00,0x00,0x46}};
 
+#if defined(__cplusplus) && !defined(CINTERFACE)
 /** IUnknown base-class for non-Windows platforms. */
 struct IUnknown {
     /** Cast method. */
@@ -392,9 +399,26 @@ struct IUnknown {
     virtual ULONG AddRef () = 0;
     virtual ULONG Release () = 0;
 };
+#else /* C style interface */
+struct IUnknown;
+
+typedef struct IUnknownVtbl {
+    HRESULT (STDMETHODCALLTYPE *QueryInterface) (IUnknown* This, const IID& riid, void** ppvObject);
+    ULONG (STDMETHODCALLTYPE *AddRef) (IUnknown* This);
+    ULONG (STDMETHODCALLTYPE *Release) (IUnknown* This);
+} IUnknownVtbl;
+
+struct IUnknown {
+    CONST_VTBL struct IUnknownVtbl* lpVtbl;
+};
+#endif
 } // extern "C"
 DEFINE_UUIDOF(IUnknown)
 
+#ifndef CINTERFACE
+/* The ATL emulation below calls IUnknown through its C++ interface, so it is
+   only available to translation units using that form. This mirrors Windows,
+   where a CINTERFACE translation unit gets unknwn.h but never the ATL headers. */
 
 /** Resolve COM class CLSID based on "[<Program>.]<Component>[.<Version>]" ProgID string. */
 extern "C" // to avoid name mangling
@@ -1241,9 +1265,6 @@ template <> unsigned int CComSafeArray<BSTR>::GetCount () const;
 template <> unsigned int CComSafeArray<IUnknown*>::GetCount () const;
 
 
-// COM calling convention (use default on non-Windows)
-#define STDMETHODCALLTYPE
-
 #define ATL_NO_VTABLE 
 
 // QueryInterface support macros
@@ -1314,3 +1335,5 @@ class CComCoClass {
 #ifndef _ATL_NO_AUTOMATIC_NAMESPACE
   using namespace ATL;
 #endif
+
+#endif // CINTERFACE
