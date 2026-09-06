@@ -378,13 +378,16 @@ class CComPtr;
 template<typename T>
 class _com_ptr_t;
 
-#if !defined(CINTERFACE)
-
+    
 extern "C" {
 // interface ID values for well-known interfaces
 static constexpr GUID IID_IUnknown       = {0x00000000,0x0000,0x0000,{0xC0,0x00,0x00,0x00,0x00,0x00,0x00,0x46}};
 static constexpr GUID IID_IMessageFilter = {0x00000016,0x0000,0x0000,{0xC0,0x00,0x00,0x00,0x00,0x00,0x00,0x46}};
+} // extern "C"
+    
+#if !defined(CINTERFACE)
 
+extern "C" {
 /** IUnknown base-class for non-Windows platforms. */
 struct IUnknown {
     /** Cast method. */
