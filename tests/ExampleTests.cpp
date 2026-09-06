@@ -1,6 +1,7 @@
 #include <AppAPI/ComSupport.hpp>
 #include "Example.h"
 #include <gtest/gtest.h>
+#include "ExampleVtableTests.hpp"
 
 
 class Calculator : 
@@ -48,6 +49,8 @@ TEST(ExampleTests, TestConstructionAndMethods) {
         hr = ptr->GetValue(&val);
         EXPECT_EQ(hr, S_OK);
         EXPECT_EQ(val, 42);
+
+        TestICalcVtable(ptr);
     }
     
     {
@@ -58,6 +61,8 @@ TEST(ExampleTests, TestConstructionAndMethods) {
         hr = ptr->Add(1, 2, &val);
         EXPECT_EQ(hr, S_OK);
         EXPECT_EQ(val, 3);
+
+        TestICalcExtVtable(ptr);
     }
 
     {
@@ -68,5 +73,7 @@ TEST(ExampleTests, TestConstructionAndMethods) {
         hr = ptr->GetValue2(&val);
         EXPECT_EQ(hr, S_OK);
         EXPECT_EQ(val, 43);
+
+        TestICalc2Vtable(ptr);
     }
 }

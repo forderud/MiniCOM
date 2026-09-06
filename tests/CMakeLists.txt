@@ -42,6 +42,8 @@ set(TEST_SOURCES
     ComPtrTests.cpp
     DynamicCastTests.cpp
     ExampleTests.cpp
+    ExampleVtableTests.hpp
+    ExampleVtableTests.cpp
     SafeArrayTests.cpp
     SharedRefTests.cpp
     StringTests.cpp
