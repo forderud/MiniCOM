@@ -3,23 +3,34 @@ project(MiniCOM_tests LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 
-# Require GoogleTest:
-# * Fedora: "dnf install gtest-devel"
-# * MacOS: "brew install googletest"
-find_package(GTest REQUIRED)
+if(WIN32)
+    include(FetchContent)
 
-# compatibility function for parsing IDL files on non-Windows platforms
-function(process_idl_files INPUT_FILES OUTPUTS_FILES)
-    find_package(Python COMPONENTS Interpreter REQUIRED)
-
-    add_custom_command(
-        OUTPUT  ${OUTPUTS_FILES}
-        COMMAND ${Python_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/../IdlParse.py" ${INPUT_FILES}
-        DEPENDS ${INPUT_FILES}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-        COMMENT "Processing IDL files..."
+    FetchContent_Declare(googletest
+      GIT_REPOSITORY https://github.com/google/googletest.git
+      GIT_TAG        v1.18.0
     )
-endfunction()
+
+    FetchContent_MakeAvailable(googletest)
+else()
+    # Require GoogleTest:
+    # * Fedora: "dnf install gtest-devel"
+    # * MacOS: "brew install googletest"
+    find_package(GTest REQUIRED)
+
+    # compatibility function for parsing IDL files on non-Windows platforms
+    function(process_idl_files INPUT_FILES OUTPUTS_FILES)
+        find_package(Python COMPONENTS Interpreter REQUIRED)
+
+        add_custom_command(
+            OUTPUT  ${OUTPUTS_FILES}
+            COMMAND ${Python_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/../IdlParse.py" ${INPUT_FILES}
+            DEPENDS ${INPUT_FILES}
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+            COMMENT "Processing IDL files..."
+        )
+    endfunction()
+endif()
 
 
 set(TEST_SOURCES
@@ -53,7 +64,13 @@ target_include_directories(MiniCOM_tests PRIVATE
     "${CMAKE_CURRENT_BINARY_DIR}"
 )
 
-if(NOT WIN32)
+if(WIN32)
+    target_sources(MiniCOM_tests PRIVATE "${IDL_INPUTS}")
+
+    # Add intermediate directory with MIDL output files to include path
+    set(INT_DIR "${CMAKE_CURRENT_BINARY_DIR}/MiniCOM_tests.dir/${CMAKE_CFG_INTDIR}")
+    target_include_directories(MiniCOM_tests PRIVATE "${INT_DIR}")
+else()
     process_idl_files("${IDL_INPUTS}" "${IDL_OUTPUTS}")
     target_sources(MiniCOM_tests PRIVATE "${IDL_OUTPUTS}")
 endif()
