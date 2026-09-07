@@ -6,7 +6,7 @@ set -e # stop on first failure
 rm -rf build
 
 # Generate project files
-cmake -S . -B build
+cmake -S . -B build -DPython_EXECUTABLE="$(which python3)"
 
 # Build & run tests
 cmake --build build
