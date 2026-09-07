@@ -1,8 +1,3 @@
-cmake_minimum_required(VERSION 3.16)
-project(MiniCOM_tests LANGUAGES CXX)
-
-set(CMAKE_CXX_STANDARD 17)
-
 if(WIN32)
     include(FetchContent)
 
@@ -54,9 +49,6 @@ endif()
 
 set(IDL_INPUTS  "${CMAKE_CURRENT_SOURCE_DIR}/Example.idl")
 set(IDL_OUTPUTS "${CMAKE_CURRENT_BINARY_DIR}/Example.h")
-
-
-add_definitions(-DUNICODE -D_UNICODE)
 
 add_executable(MiniCOM_tests ${TEST_SOURCES})
 
