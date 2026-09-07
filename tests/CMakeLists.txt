@@ -12,19 +12,6 @@ else()
     # * Fedora: "dnf install gtest-devel"
     # * MacOS: "brew install googletest"
     find_package(GTest REQUIRED)
-
-    # compatibility function for parsing IDL files on non-Windows platforms
-    function(process_idl_files INPUT_FILES OUTPUTS_FILES)
-        find_package(Python COMPONENTS Interpreter REQUIRED)
-
-        add_custom_command(
-            OUTPUT  ${OUTPUTS_FILES}
-            COMMAND ${Python_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/../IdlParse.py" ${INPUT_FILES}
-            DEPENDS ${INPUT_FILES}
-            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-            COMMENT "Processing IDL files..."
-        )
-    endfunction()
 endif()
 
 
