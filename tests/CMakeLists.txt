@@ -1,3 +1,5 @@
+find_package(Python REQUIRED COMPONENTS Development.Module NumPy)
+
 if(WIN32)
     include(FetchContent)
 
@@ -37,6 +39,7 @@ set(TEST_SOURCES
     ComPtrTests.cpp
     DynamicCastTests.cpp
     ExampleTests.cpp
+    ExamplePythonTests.cpp
     ExampleVtableTests.hpp
     ExampleVtableTests.cpp
     SafeArrayTests.cpp
@@ -69,10 +72,19 @@ else()
     target_sources(MiniCOM_tests PRIVATE "${IDL_OUTPUTS}")
 endif()
 
+target_link_libraries(MiniCOM_tests PUBLIC 
+        Python::Module
+        Python::NumPy
+        )
+target_include_directories(MiniCOM_tests PRIVATE
+    ${Python_SITELIB}/pybind11/include # expect PyBind11 to be installed together with Python
+    )
+
 target_link_libraries(MiniCOM_tests PRIVATE GTest::gtest)
 
 # run test suite as post-build event
 add_custom_command(TARGET MiniCOM_tests POST_BUILD
+                   COMMAND set PATH=%PATH%\;${Python_STDLIB}\\..
                    COMMAND $<TARGET_FILE:MiniCOM_tests>
                    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
                    COMMENT "Running test suite")
