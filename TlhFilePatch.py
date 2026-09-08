@@ -133,23 +133,20 @@ def AddFunctionsToSource(source, functions):
 
 
 def MakeTliIncludeRelative(source, tli_file):
-    '''Replace #include "<absolute-path>\\<filename>.tli" with #include "<filename>.tli"'''
-    # remove path prefix
-    idx = tli_file.rfind('\\')
-    if idx:
-        tli_file = tli_file[idx+1:]
-    
+    '''Replace #include "<absolute-path>\\<filename>.tli" with the basename of the
+       TLI file that is actually written alongside the patched TLH.'''
+    tli_file = os.path.basename(tli_file)
+
     for i in range(len(source)):
-        # parse line
         if source[i][:10] != '#include "':
             continue
-        
-        if '\\'+tli_file.lower()+'"\n' not in source[i]:
+
+        if not source[i].rstrip().endswith('.tli"'):
             continue
-        
+
         source[i] = '#include "'+tli_file+'"\n'
         print("TLI include patched.")
-    
+
     return source
 
 
@@ -193,7 +190,13 @@ def MakeUUIDsPortable(source):
         cur_interface = tokens[3].split(";")[0]
         interfaces[cur_interface] = cur_uuid
 
-    insert_line = len(new_source)-9 # insert above #include "<name>.tli" line
+    # insert above the #include "<name>.tli" line, which follows the last interface
+    insert_line = len(new_source)
+    for i in range(len(new_source)):
+        if (new_source[i][:10] == '#include "') and new_source[i].rstrip().endswith('.tli"'):
+            insert_line = i
+            break
+
     new_source.insert(insert_line, "#ifndef _WIN32\n")
     insert_line += 1
     
@@ -247,7 +250,7 @@ def ExtractIncludes(cpp_content):
     return list(sorted(includes))
 
 
-def PatchTlhFile(tlh_file_in, tlh_file_out, tli_file_in, remove_header, cross_platorm):
+def PatchTlhFile(tlh_file_in, tlh_file_out, tli_file_out, remove_header, cross_platorm):
     this_script_dir = os.path.dirname(os.path.abspath(__file__))
     cpp_content = ExtractCppQuoteFromIDLs(this_script_dir)
     
@@ -259,7 +262,7 @@ def PatchTlhFile(tlh_file_in, tlh_file_out, tli_file_in, remove_header, cross_pl
         # done to make the content deterministic and suitable for versioning
         source = source[6:]
     
-    source = MakeTliIncludeRelative(source, tli_file_in)
+    source = MakeTliIncludeRelative(source, tli_file_out)
     source = ReplaceStructs(source, cpp_content)
     if cross_platorm:
         source = MakeUUIDsPortable(source)
@@ -328,5 +331,5 @@ if __name__ == "__main__":
     remove_header = True # remove non-deterministic header containing time-stamps
     cross_platorm = True # tweak headers to also build on non-Windows platforms
     
-    PatchTlhFile(tlh_file_in, tlh_file_out, tli_file_in, remove_header, cross_platorm)
+    PatchTlhFile(tlh_file_in, tlh_file_out, tli_file_out, remove_header, cross_platorm)
     PatchTliFile(tli_file_in, tli_file_out, remove_header, cross_platorm)

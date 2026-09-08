@@ -1,3 +1,7 @@
 # Shell scripts require LF
 *.sh    text eol=lf
 *.py    text eol=lf
+
+# Generated TLH/TLI wrappers are written with CRLF by TlhFilePatch.py
+*.tlh   text eol=crlf
+*.tli   text eol=crlf

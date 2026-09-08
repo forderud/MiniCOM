@@ -1,0 +1,143 @@
+
+#pragma once
+#pragma pack(push, 8)
+
+#ifdef _WIN32
+#include <comdef.h>
+#endif
+
+namespace ExampleLib {
+
+//
+// Forward references and typedefs
+//
+
+struct 
+#ifdef _WIN32
+__declspec(uuid("797c7c01-88f4-4794-aa1c-acd612be9af4"))
+#endif
+/* LIBID */ __ExampleLib;
+struct 
+#ifdef _WIN32
+__declspec(uuid("9e91b361-831f-4857-82f7-347a8592c70b"))
+#endif
+/* interface */ ICalc;
+struct __MIDL___MIDL_itf_Example_0006_0001_0001;
+struct 
+#ifdef _WIN32
+__declspec(uuid("6325535d-4f1a-407b-aadb-d22820cab047"))
+#endif
+/* interface */ ICalcExt;
+struct 
+#ifdef _WIN32
+__declspec(uuid("d8ac9315-ce17-4268-911f-18f5f2135b7f"))
+#endif
+/* interface */ ICalc2;
+
+//
+// Smart pointer typedef declarations
+//
+
+_COM_SMARTPTR_TYPEDEF(ICalc, __uuidof(ICalc));
+_COM_SMARTPTR_TYPEDEF(ICalcExt, __uuidof(ICalcExt));
+_COM_SMARTPTR_TYPEDEF(ICalc2, __uuidof(ICalc2));
+
+//
+// Type library items
+//
+
+struct 
+#ifdef _WIN32
+__declspec(uuid("9e91b361-831f-4857-82f7-347a8592c70b"))
+#endif
+ICalc : IUnknown
+{
+    //
+    // Wrapper methods for error-handling
+    //
+
+    int GetValue ( );
+
+    //
+    // Raw methods provided by interface
+    //
+
+      virtual HRESULT __stdcall raw_GetValue (
+        /*[out,retval]*/ int * value ) = 0;
+};
+
+#pragma pack(push, 4)
+
+struct __MIDL___MIDL_itf_Example_0006_0001_0001
+{
+    unsigned long Data1;
+    unsigned short Data2;
+    unsigned short Data3;
+    unsigned char Data4[8];
+};
+
+#pragma pack(pop)
+
+struct 
+#ifdef _WIN32
+__declspec(uuid("6325535d-4f1a-407b-aadb-d22820cab047"))
+#endif
+ICalcExt : ICalc
+{
+    //
+    // Wrapper methods for error-handling
+    //
+
+    int Add (
+        int a,
+        int b );
+
+    //
+    // Raw methods provided by interface
+    //
+
+      virtual HRESULT __stdcall raw_Add (
+        /*[in]*/ int a,
+        /*[in]*/ int b,
+        /*[out,retval]*/ int * result ) = 0;
+};
+
+struct 
+#ifdef _WIN32
+__declspec(uuid("d8ac9315-ce17-4268-911f-18f5f2135b7f"))
+#endif
+ICalc2 : IUnknown
+{
+    //
+    // Wrapper methods for error-handling
+    //
+
+    int GetValue2 ( );
+
+    //
+    // Raw methods provided by interface
+    //
+
+      virtual HRESULT __stdcall raw_GetValue2 (
+        /*[out,retval]*/ int * value ) = 0;
+};
+
+//
+// Wrapper method implementations
+//
+
+#ifndef _WIN32
+static constexpr GUID IID_ICalc = {0x9e91b361,0x831f,0x4857,{0x82,0xf7,0x34,0x7a,0x85,0x92,0xc7,0x0b}};
+static constexpr GUID IID_ICalc2 = {0xd8ac9315,0xce17,0x4268,{0x91,0x1f,0x18,0xf5,0xf2,0x13,0x5b,0x7f}};
+static constexpr GUID IID_ICalcExt = {0x6325535d,0x4f1a,0x407b,{0xaa,0xdb,0xd2,0x28,0x20,0xca,0xb0,0x47}};
+} // namespace ExampleLib
+DEFINE_UUIDOF_ID(ExampleLib::ICalc, ExampleLib::IID_ICalc)
+DEFINE_UUIDOF_ID(ExampleLib::ICalc2, ExampleLib::IID_ICalc2)
+DEFINE_UUIDOF_ID(ExampleLib::ICalcExt, ExampleLib::IID_ICalcExt)
+namespace ExampleLib {
+#endif
+#include "ExampleWrap.tli"
+
+} // namespace ExampleLib
+
+#pragma pack(pop)

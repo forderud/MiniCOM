@@ -1,0 +1,35 @@
+
+#pragma once
+
+//
+// interface ICalc wrapper method implementations
+//
+
+inline int ICalc::GetValue ( ) {
+    int _result = 0;
+    HRESULT _hr = raw_GetValue(&_result);
+    if (FAILED(_hr)) _com_issue_errorex(_hr, this, __uuidof(std::remove_reference_t<decltype(*this)>));
+    return _result;
+}
+
+//
+// interface ICalcExt wrapper method implementations
+//
+
+inline int ICalcExt::Add ( int a, int b ) {
+    int _result = 0;
+    HRESULT _hr = raw_Add(a, b, &_result);
+    if (FAILED(_hr)) _com_issue_errorex(_hr, this, __uuidof(std::remove_reference_t<decltype(*this)>));
+    return _result;
+}
+
+//
+// interface ICalc2 wrapper method implementations
+//
+
+inline int ICalc2::GetValue2 ( ) {
+    int _result = 0;
+    HRESULT _hr = raw_GetValue2(&_result);
+    if (FAILED(_hr)) _com_issue_errorex(_hr, this, __uuidof(std::remove_reference_t<decltype(*this)>));
+    return _result;
+}

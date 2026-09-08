@@ -40,3 +40,12 @@ interface ICalc2 : IUnknown {
     [helpstring("Get magic value.")]
     HRESULT GetValue2 ([out,retval] int * value);
 };
+
+[ uuid(797C7C01-88F4-4794-AA1C-ACD612BE9AF4),
+  version(1.0),
+  helpstring("Example type library.")]
+library ExampleLib {
+    interface ICalc;
+    interface ICalcExt;
+    interface ICalc2;
+};
