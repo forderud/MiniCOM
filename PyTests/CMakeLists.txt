@@ -12,30 +12,15 @@ if(NOT WIN32)
     list(APPEND PyTests_SOURCES "../NonWindows.cpp")
 endif()
 
-set(IDL_INPUTS  "${CMAKE_CURRENT_SOURCE_DIR}/Example.idl")
-set(IDL_OUTPUTS "${CMAKE_CURRENT_BINARY_DIR}/Example.h")
-
-
 python_add_library(PyTests MODULE ${PyTests_SOURCES})
 
 target_include_directories(PyTests PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}/.."
-    "${CMAKE_CURRENT_BINARY_DIR}"
 )
 
-if(WIN32)
-    target_sources(PyTests PRIVATE "${IDL_INPUTS}")
-
-    # Add intermediate directory with MIDL output files to include path
-    set(INT_DIR "${CMAKE_CURRENT_BINARY_DIR}/PyTests.dir/${CMAKE_CFG_INTDIR}")
-    target_include_directories(PyTests PRIVATE "${INT_DIR}")
-else()
-    process_idl_files("${IDL_INPUTS}" "${IDL_OUTPUTS}")
-    target_sources(PyTests PRIVATE "${IDL_OUTPUTS}")
-endif()
-
-target_link_libraries(PyTests PUBLIC 
+target_link_libraries(PyTests PUBLIC
+        TestInterfaces
         Python::Module
         Python::NumPy
         pybind11::headers
