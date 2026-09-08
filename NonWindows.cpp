@@ -50,6 +50,9 @@ HRESULT CoCreateInstance (const GUID& clsid, IUnknown* outer, DWORD context, con
         return E_POINTER;
     *result = nullptr;
 
+    if (outer && !(iid == IID_IUnknown))
+        return E_INVALIDARG;
+
     for (size_t i = 0; i < IUnknownFactory::Factories().size(); i++) {
         const auto & elm = IUnknownFactory::Factories()[i];
         if (elm.clsid == clsid) {
