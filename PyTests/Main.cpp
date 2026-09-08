@@ -64,9 +64,32 @@ namespace PYBIND11_NAMESPACE {
     }
 }
 
+
+template <class T>
+static CComPtr<T> ComCast(IUnknown& obj) {
+    CComPtr<T> ptr;
+    CHECK(obj.QueryInterface(&ptr));
+    return ptr;
+}
+
+/** Map a python interface type to a QueryInterface call. */
+static py::object QueryInterface(IUnknown& obj, const py::object& iface) {
+    if (iface.is(py::type::of<IUnknown>()))
+        return py::cast(ComCast<IUnknown>(obj));
+    if (iface.is(py::type::of<ICalc>()))
+        return py::cast(ComCast<ICalc>(obj));
+    if (iface.is(py::type::of<ICalcExt>()))
+        return py::cast(ComCast<ICalcExt>(obj));
+    if (iface.is(py::type::of<ICalc2>()))
+        return py::cast(ComCast<ICalc2>(obj));
+
+    throw py::type_error("Unknown COM interface.");
+}
+
 PYBIND11_MODULE(PyTests, m, py::mod_gil_not_used()) {
     /** Bind IUnknown. */
     py::class_<IUnknown, CComPtr<IUnknown>>(m, "IUnknown")
+        .def("QueryInterface", &QueryInterface, "Type cast method")
         .def("AddRef", &IUnknown::AddRef)
         .def("Release", &IUnknown::Release);
 
