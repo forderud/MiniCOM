@@ -12,7 +12,7 @@ if(NOT WIN32)
     list(APPEND PyTests_SOURCES "../NonWindows.cpp")
 endif()
 
-set(IDL_INPUTS  "${CMAKE_CURRENT_SOURCE_DIR}/../tests/Example.idl")
+set(IDL_INPUTS  "${CMAKE_CURRENT_SOURCE_DIR}/Example.idl")
 set(IDL_OUTPUTS "${CMAKE_CURRENT_BINARY_DIR}/Example.h")
 
 

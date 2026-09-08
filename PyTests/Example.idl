@@ -1,0 +1,29 @@
+/* Interfaces for test purposes. */
+import "oaidl.idl";
+
+[ object,
+  oleautomation,
+  uuid(9E91B361-831F-4857-82F7-347A8592C70B),
+  helpstring("Initial interface.")]
+interface ICalc : IUnknown {
+    [helpstring("Get magic value.")]
+    HRESULT GetValue ([out,retval] int * value);
+};
+
+[ object,
+  oleautomation,
+  uuid(6325535D-4F1A-407B-AADB-D22820CAB047),
+  helpstring("Derived interface with aditional method(s).")]
+interface ICalcExt : ICalc {
+    [helpstring("Add two values.")]
+    HRESULT Add ([in] int a, [in] int b, [out,retval] int * result);
+};
+
+[ object,
+  oleautomation,
+  uuid(D8AC9315-CE17-4268-911F-18F5F2135B7F),
+  helpstring("Newer interface. For testing of multiple inheritance.")]
+interface ICalc2 : IUnknown {
+    [helpstring("Get magic value.")]
+    HRESULT GetValue2 ([out,retval] int * value);
+};
