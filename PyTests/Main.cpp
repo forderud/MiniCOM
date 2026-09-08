@@ -70,18 +70,21 @@ PYBIND11_MODULE(PyTests, m, py::mod_gil_not_used()) {
         .def("AddRef", &IUnknown::AddRef)
         .def("Release", &IUnknown::Release);
 
+    /** Bind ICalc. */
+    py::class_<ICalc, IUnknown, CComPtr<ICalc>>(m, "ICalc")
+        .def("GetValue", [](ICalc& self) {
+        // convert output argument to return value
+        int val = 0;
+        CHECK(self.GetValue(&val));
+        return val;
+            });
+
     /** Bind ICalcExt. */
     py::class_<ICalcExt, CComPtr<ICalcExt>>(m, "ICalcExt")
-        .def("GetValue", [](ICalcExt* m) {
+        .def("Add", [](ICalcExt& self, int left, int right) {
             // convert output argument to return value
             int val = 0;
-            CHECK(m->GetValue(&val));
-            return val;
-        })
-        .def("Add", [](ICalcExt* m, int left, int right) {
-            // convert output argument to return value
-            int val = 0;
-            CHECK(m->Add(left, right, &val));
+            CHECK(self.Add(left, right, &val));
             return val;
         });
 
