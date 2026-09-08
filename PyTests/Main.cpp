@@ -80,7 +80,7 @@ PYBIND11_MODULE(PyTests, m, py::mod_gil_not_used()) {
             });
 
     /** Bind ICalcExt. */
-    py::class_<ICalcExt, CComPtr<ICalcExt>>(m, "ICalcExt")
+    py::class_<ICalcExt, ICalc, CComPtr<ICalcExt>>(m, "ICalcExt")
         .def("Add", [](ICalcExt& self, int left, int right) {
             // convert output argument to return value
             int val = 0;
