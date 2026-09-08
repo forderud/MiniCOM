@@ -34,29 +34,14 @@ if(NOT WIN32)
     list(APPEND TEST_SOURCES "../NonWindows.cpp")
 endif()
 
-set(IDL_INPUTS  "${CMAKE_CURRENT_SOURCE_DIR}/Example.idl")
-set(IDL_OUTPUTS "${CMAKE_CURRENT_BINARY_DIR}/Example.h")
-
 add_executable(MiniCOM_tests ${TEST_SOURCES})
 
 target_include_directories(MiniCOM_tests PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}/.."
-    "${CMAKE_CURRENT_BINARY_DIR}"
 )
 
-if(WIN32)
-    target_sources(MiniCOM_tests PRIVATE "${IDL_INPUTS}")
-
-    # Add intermediate directory with MIDL output files to include path
-    set(INT_DIR "${CMAKE_CURRENT_BINARY_DIR}/MiniCOM_tests.dir/${CMAKE_CFG_INTDIR}")
-    target_include_directories(MiniCOM_tests PRIVATE "${INT_DIR}")
-else()
-    process_idl_files("${IDL_INPUTS}" "${IDL_OUTPUTS}")
-    target_sources(MiniCOM_tests PRIVATE "${IDL_OUTPUTS}")
-endif()
-
-target_link_libraries(MiniCOM_tests PRIVATE GTest::gtest)
+target_link_libraries(MiniCOM_tests PRIVATE TestInterfaces GTest::gtest)
 
 # run test suite as post-build event
 add_custom_command(TARGET MiniCOM_tests POST_BUILD

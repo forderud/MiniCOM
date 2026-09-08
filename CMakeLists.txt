@@ -23,5 +23,6 @@ if(NOT WIN32)
     endfunction()
 endif()
 
+add_subdirectory(TestInterfaces)
 add_subdirectory(tests)
 add_subdirectory(PyTests)
