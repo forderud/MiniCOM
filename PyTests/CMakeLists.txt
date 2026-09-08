@@ -1,4 +1,4 @@
-find_package(Python REQUIRED COMPONENTS Development.Module NumPy)
+find_package(Python REQUIRED COMPONENTS Interpreter Development.Module) # Interpreter needed for Python_SITELIB below
 
 set(pybind11_DIR ${Python_SITELIB}/pybind11/share/cmake/pybind11) # "sudo pip install pybind11"
 find_package(pybind11 CONFIG REQUIRED)
@@ -22,7 +22,6 @@ target_include_directories(PyTests PRIVATE
 target_link_libraries(PyTests PUBLIC
         TestInterfaces
         Python::Module
-        Python::NumPy
         pybind11::headers
         )
 
