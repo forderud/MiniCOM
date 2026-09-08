@@ -13,7 +13,7 @@ PyTestsAtlModule _AtlModule;
 
 
 /** C++ COM class to be called from Python. */
-class Calculator : 
+class Calculator :
     public CComObjectRootEx<CComMultiThreadModel>, // also compatible with STA
     public CComCoClass<Calculator>, // no CLSID needed
     public ICalcExt, public ICalc2 {
