@@ -73,11 +73,11 @@ PYBIND11_MODULE(PyTests, m, py::mod_gil_not_used()) {
     /** Bind ICalc. */
     py::class_<ICalc, IUnknown, CComPtr<ICalc>>(m, "ICalc")
         .def("GetValue", [](ICalc& self) {
-        // convert output argument to return value
-        int val = 0;
-        CHECK(self.GetValue(&val));
-        return val;
-            });
+            // convert output argument to return value
+            int val = 0;
+            CHECK(self.GetValue(&val));
+            return val;
+        });
 
     /** Bind ICalcExt. */
     py::class_<ICalcExt, ICalc, CComPtr<ICalcExt>>(m, "ICalcExt")
@@ -88,11 +88,20 @@ PYBIND11_MODULE(PyTests, m, py::mod_gil_not_used()) {
             return val;
         });
 
+    /** Bind ICalc2.. */
+    py::class_<ICalc2, IUnknown, CComPtr<ICalc2>>(m, "ICalc2")
+        .def("GetValue2", [](ICalc2& self) {
+            // convert output argument to return value
+            int val = 0;
+            CHECK(self.GetValue2(&val));
+            return val;
+        });
+
     /** Factory function. */
     m.def("CreateCalculator", []() {
         CComPtr<Calculator> calculator = CreateLocalInstance<Calculator>();
         CComPtr<ICalcExt> ptr;
         CHECK(calculator.QueryInterface(&ptr));
         return ptr;
-        }, "Create COM Calculator object");
+    }, "Create COM Calculator object");
 }
