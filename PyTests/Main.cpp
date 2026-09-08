@@ -89,7 +89,7 @@ PYBIND11_MODULE(PyTests, m, py::mod_gil_not_used()) {
     m.def("CreateCalculator", []() {
         CComPtr<Calculator> calculator = CreateLocalInstance<Calculator>();
         CComPtr<ICalcExt> ptr;
-        calculator.QueryInterface(&ptr);
+        CHECK(calculator.QueryInterface(&ptr));
         return ptr;
         }, "Create COM Calculator object");
 }
