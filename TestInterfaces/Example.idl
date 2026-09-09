@@ -1,6 +1,16 @@
 /* Interfaces for test purposes. */
 import "oaidl.idl";
 
+
+[object,
+  oleautomation,
+  uuid(69B1A795-7579-4DAC-8FC9-72D410E346D3),
+  helpstring("Callback interface for testing bidirectional communication.")]
+interface ICalcCb : IUnknown {
+    [helpstring("Process message.")]
+    HRESULT Message([in,string] BSTR message);
+};
+
 [ object,
   oleautomation,
   uuid(9E91B361-831F-4857-82F7-347A8592C70B),
@@ -12,11 +22,14 @@ interface ICalc : IUnknown {
 
 [ object,
   oleautomation,
-  uuid(6325535D-4F1A-407B-AADB-D22820CAB047),
+  uuid(37368275-D3C9-48B0-9F75-781531E6E719),
   helpstring("Derived interface with aditional method(s).")]
 interface ICalcExt : ICalc {
     [helpstring("Add two values.")]
     HRESULT Add ([in] int a, [in] int b, [out,retval] int * result);
+
+    [helpstring("Set callback object.")]
+    HRESULT SetCallback([in] ICalcCb * cb);
 };
 
 [ object,
