@@ -47,11 +47,19 @@ public:
             return E_INVALIDARG;
 
         *value = 43;
+
+        if (m_callback)
+            m_callback->Message(CComBSTR(L"GetValue2 called"));
+
         return S_OK;
     }
 
     HRESULT SetCallback(ICalcCb* cb) override {
-        return E_NOTIMPL;
+        if (!cb)
+            return E_INVALIDARG;
+
+        m_callback = cb;
+        return S_OK;
     }
 
     BEGIN_COM_MAP(Calculator)
@@ -59,8 +67,63 @@ public:
         COM_INTERFACE_ENTRY(ICalcExt)
         COM_INTERFACE_ENTRY(ICalc2)
     END_COM_MAP()
+
+private:
+    CComPtr<ICalcCb> m_callback;
 };
 
+
+/** Trampoline class for Python callbacks. */
+class PyICalcCb : public ICalcCb {
+public:
+    PyICalcCb() {
+        py::print("PyICalcCb ctor.\n");
+    }
+    ~PyICalcCb() {
+        py::print("PyICalcCb dtor.\n");
+    }
+
+    // Trampoline for the pure virtual function
+    HRESULT Message(BSTR msg) override {
+        PYBIND11_OVERRIDE_PURE(
+            HRESULT,  // Return type
+            ICalcCb,  // Parent class
+            Message,  // Name of function in C++ (and Python)
+            msg       // Arguments
+        );
+    }
+
+    HRESULT QueryInterface(const GUID& iid, /*out*/void** obj) override {
+        if (!obj)
+            return E_POINTER;
+
+        if (iid == __uuidof(IUnknown)) {
+            *obj = static_cast<IUnknown*>(this);
+        } else if (iid == __uuidof(ICalcCb)) {
+            *obj = static_cast<ICalcCb*>(this);
+        } else {
+            return E_NOINTERFACE;
+        }
+
+        AddRef();
+        return S_OK;
+    }
+
+    ULONG AddRef() override {
+        assert((m_ref < 0xFFFF) && "IUnknown::AddRef negative ref count.");
+        return ++m_ref;
+    }
+    ULONG Release() override {
+        ULONG ref = --m_ref;
+        assert((m_ref < 0xFFFF) && "IUnknown::Release negative ref count.");
+        if (!ref)
+            delete this;
+        return ref;
+    }
+
+private:
+    std::atomic<int> m_ref{ 0 };
+};
 
 /** PyBind11-compatible wrapper around CComPtr<T>. */
 template <typename T>
@@ -71,8 +134,7 @@ public:
     CComHolder() = default;
 
     CComHolder(const CComPtr<T>& other) : CComPtr<T>(other) {}
-    CComHolder(CComPtr<T>&& other) : CComPtr<T>(other) {
-    }
+    CComHolder(CComPtr<T>&& other) : CComPtr<T>(other) {}
 
     /** Work-around for CComPtr::operator& asserting p==NULL. */
     CComHolder* operator&() noexcept {
@@ -99,6 +161,8 @@ static CComHolder<T> ComCast(IUnknown& obj) {
 static py::object QueryInterface(IUnknown& obj, const py::object& iface) {
     if (iface.is(py::type::of<IUnknown>()))
         return py::cast(ComCast<IUnknown>(obj));
+    if (iface.is(py::type::of<ICalcCb>()))
+        return py::cast(ComCast<ICalcCb>(obj));
     if (iface.is(py::type::of<ICalc>()))
         return py::cast(ComCast<ICalc>(obj));
     if (iface.is(py::type::of<ICalcExt>()))
@@ -116,6 +180,19 @@ PYBIND11_MODULE(PyTests, m, py::mod_gil_not_used()) {
         .def("AddRef", &IUnknown::AddRef)
         .def("Release", &IUnknown::Release);
 
+    /** Bind ICalcCb. */
+    py::class_<ICalcCb, CComHolder<ICalcCb>>(m, "ICalcCb")
+        .def(py::init([]() {
+            auto* ptr = new PyICalcCb();
+            CComHolder<ICalcCb> obj;
+            ptr->QueryInterface(__uuidof(ICalcCb), (void**)&obj);
+            return obj;
+            }))
+        .def("Message", [](ICalcCb& self, BSTR msg) {
+            CHECK(self.Message(msg));
+            return;
+            });
+
     /** Bind ICalc. */
     py::class_<ICalc, IUnknown, CComHolder<ICalc>>(m, "ICalc")
         .def("GetValue", [](ICalc& self) {
@@ -132,6 +209,10 @@ PYBIND11_MODULE(PyTests, m, py::mod_gil_not_used()) {
             int val = 0;
             CHECK(self.Add(left, right, &val));
             return val;
+        })
+        .def("SetCallback", [](ICalcExt& self, ICalcCb& cb) {
+            CHECK(self.SetCallback(&cb));
+            return;
         });
 
     /** Bind ICalc2.. */

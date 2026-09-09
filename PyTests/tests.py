@@ -1,6 +1,17 @@
 import PyTests # require PyTests.pyd in PYTHONPATH or sys.path
 
+
+class CalcCb(PyTests.ICalcCb):
+    def __init__(self):
+        super().__init__()
+    def Message(self, msg):
+        print("Received message: "+msg)
+        return 0 # S_OK
+
+cb = CalcCb()
+
 calc = PyTests.CreateCalculator()
+calc.SetCallback(cb)
 
 val = calc.GetValue()
 print("calc.GetValue() returned "+str(val))
