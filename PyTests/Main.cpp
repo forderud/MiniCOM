@@ -62,26 +62,36 @@ public:
 };
 
 
-/** Declare CComPtr<T> as smart-pointer type. */
-PYBIND11_DECLARE_HOLDER_TYPE(T, CComPtr<T>, /*intrusive ref-count*/true);
+/** PyBind11-compatible wrapper around CComPtr<T>. */
+template <typename T>
+class CComHolder : public CComPtr<T> {
+public:
+    using CComPtr<T>::CComPtr;
 
-namespace PYBIND11_NAMESPACE {
-    namespace detail {
-        /** Work-around for missing a .get() method in CComPtr<T>. */
-        template <typename T>
-        struct holder_helper<CComPtr<T>> { // <-- specialization
-            static T* get(const CComPtr<T>& p) {
-                return p;
-            }
-        };
+    CComHolder() = default;
+
+    CComHolder(const CComPtr<T>& other) : CComPtr<T>(other) {}
+    CComHolder(CComPtr<T>&& other) : CComPtr<T>(other) {
     }
-}
 
+    /** Work-around for CComPtr::operator& asserting p==NULL. */
+    CComHolder* operator&() noexcept {
+        return this;
+    }
+
+    /** Work-around for missing CComPtr<T>::get() method. */
+    T* get() const {
+        return *this;
+    }
+};
+
+/** Declare CComHolder<T> as smart-pointer type. */
+PYBIND11_DECLARE_HOLDER_TYPE(T, CComHolder<T>, /*intrusive ref-count*/true);
 
 template <class T>
-static CComPtr<T> ComCast(IUnknown& obj) {
-    CComPtr<T> ptr;
-    CHECK(obj.QueryInterface(&ptr));
+static CComHolder<T> ComCast(IUnknown& obj) {
+    CComHolder<T> ptr;
+    CHECK(obj.QueryInterface(__uuidof(T), (void**)&ptr));
     return ptr;
 }
 
@@ -101,13 +111,13 @@ static py::object QueryInterface(IUnknown& obj, const py::object& iface) {
 
 PYBIND11_MODULE(PyTests, m, py::mod_gil_not_used()) {
     /** Bind IUnknown. */
-    py::class_<IUnknown, CComPtr<IUnknown>>(m, "IUnknown")
+    py::class_<IUnknown, CComHolder<IUnknown>>(m, "IUnknown")
         .def("QueryInterface", &QueryInterface, "Type cast method")
         .def("AddRef", &IUnknown::AddRef)
         .def("Release", &IUnknown::Release);
 
     /** Bind ICalc. */
-    py::class_<ICalc, IUnknown, CComPtr<ICalc>>(m, "ICalc")
+    py::class_<ICalc, IUnknown, CComHolder<ICalc>>(m, "ICalc")
         .def("GetValue", [](ICalc& self) {
             // convert output argument to return value
             int val = 0;
@@ -116,7 +126,7 @@ PYBIND11_MODULE(PyTests, m, py::mod_gil_not_used()) {
         });
 
     /** Bind ICalcExt. */
-    py::class_<ICalcExt, ICalc, CComPtr<ICalcExt>>(m, "ICalcExt")
+    py::class_<ICalcExt, ICalc, CComHolder<ICalcExt>>(m, "ICalcExt")
         .def("Add", [](ICalcExt& self, int left, int right) {
             // convert output argument to return value
             int val = 0;
@@ -125,7 +135,7 @@ PYBIND11_MODULE(PyTests, m, py::mod_gil_not_used()) {
         });
 
     /** Bind ICalc2.. */
-    py::class_<ICalc2, IUnknown, CComPtr<ICalc2>>(m, "ICalc2")
+    py::class_<ICalc2, IUnknown, CComHolder<ICalc2>>(m, "ICalc2")
         .def("GetValue2", [](ICalc2& self) {
             // convert output argument to return value
             int val = 0;
@@ -136,8 +146,8 @@ PYBIND11_MODULE(PyTests, m, py::mod_gil_not_used()) {
     /** Factory function. */
     m.def("CreateCalculator", []() {
         CComPtr<Calculator> calculator = CreateLocalInstance<Calculator>();
-        CComPtr<ICalcExt> ptr;
-        CHECK(calculator.QueryInterface(&ptr));
+        CComHolder<ICalcExt> ptr;
+        CHECK(calculator->QueryInterface(__uuidof(ICalcExt), (void**)&ptr));
         return ptr;
     }, "Create COM Calculator object");
 }
