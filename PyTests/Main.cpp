@@ -1,9 +1,10 @@
 #include <AppAPI/ComSupport.hpp>
-#include "Example.h"
+#include "Example.tlh"
 #include <pybind11/pybind11.h>
 #include <memory>
 
 namespace py = pybind11;
+using namespace TestInterfaces;
 
 #ifdef _WIN32
 class PyTestsAtlModule : public ATL::CAtlDllModuleT<PyTestsAtlModule> {
@@ -26,7 +27,7 @@ public:
         py::print("Calculator dtor.\n");
     }
 
-    HRESULT GetValue (/*out*/int * value) override {
+    HRESULT raw_GetValue (/*out*/int * value) override {
         if (!value)
             return E_INVALIDARG;
 
@@ -34,7 +35,7 @@ public:
         return S_OK;
     }
 
-    HRESULT Add (int a, int b, /*out*/int * result) override {
+    HRESULT raw_Add (int a, int b, /*out*/int * result) override {
         if (!result)
             return E_INVALIDARG;
 
@@ -42,19 +43,19 @@ public:
         return S_OK;
     }
 
-    HRESULT GetValue2 (/*out*/int * value) override {
+    HRESULT raw_GetValue2 (/*out*/int * value) override {
         if (!value)
             return E_INVALIDARG;
 
         *value = 43;
 
         if (m_callback)
-            m_callback->Message(CComBSTR(L"GetValue2 called"));
+            m_callback->Message(_bstr_t(L"GetValue2 called"));
 
         return S_OK;
     }
 
-    HRESULT SetCallback(ICalcCb* cb) override {
+    HRESULT raw_SetCallback(ICalcCb* cb) override {
         if (!cb)
             return E_INVALIDARG;
 
@@ -86,7 +87,7 @@ public:
     }
 
     // Trampoline for the pure virtual function
-    HRESULT Message(BSTR msg) override {
+    HRESULT raw_Message(BSTR msg) override {
         PYBIND11_OVERRIDE_PURE(
             HRESULT,  // Return type
             ICalcCb,  // Parent class
@@ -156,41 +157,20 @@ PYBIND11_MODULE(PyTests, m, py::mod_gil_not_used()) {
             CHECK(CComObject<PyICalcCb>::CreateInstance(&obj));
             return static_cast<ICalcCb*>(obj);
             }))
-        .def("Message", [](ICalcCb& self, BSTR msg) {
-            CHECK(self.Message(msg));
-            return;
-            });
+        .def("Message", &ICalcCb::Message);
 
     /** Bind ICalc. */
     py::class_<ICalc, IUnknown, CComPtr<ICalc>>(m, "ICalc")
-        .def("GetValue", [](ICalc& self) {
-            // convert output argument to return value
-            int val = 0;
-            CHECK(self.GetValue(&val));
-            return val;
-        });
+        .def("GetValue", &ICalc::GetValue);
 
     /** Bind ICalcExt. */
     py::class_<ICalcExt, ICalc, CComPtr<ICalcExt>>(m, "ICalcExt")
-        .def("Add", [](ICalcExt& self, int left, int right) {
-            // convert output argument to return value
-            int val = 0;
-            CHECK(self.Add(left, right, &val));
-            return val;
-        })
-        .def("SetCallback", [](ICalcExt& self, ICalcCb& cb) {
-            CHECK(self.SetCallback(&cb));
-            return;
-        });
+        .def("Add", &ICalcExt::Add)
+        .def("SetCallback", &ICalcExt::SetCallback);
 
     /** Bind ICalc2.. */
     py::class_<ICalc2, IUnknown, CComPtr<ICalc2>>(m, "ICalc2")
-        .def("GetValue2", [](ICalc2& self) {
-            // convert output argument to return value
-            int val = 0;
-            CHECK(self.GetValue2(&val));
-            return val;
-        });
+        .def("GetValue2", &ICalc2::GetValue2);
 
     /** Factory function. */
     m.def("CreateCalculator", []() {
