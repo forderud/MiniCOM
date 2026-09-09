@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(MiniCOM_tests LANGUAGES CXX)
+project(MiniCOM LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 
