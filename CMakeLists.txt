@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(MiniCOM_tests LANGUAGES CXX)
+project(MiniCOM LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -24,5 +24,5 @@ if(NOT WIN32)
 endif()
 
 add_subdirectory(TestInterfaces)
-add_subdirectory(tests)
+add_subdirectory(CppTests)
 add_subdirectory(PyTests)
