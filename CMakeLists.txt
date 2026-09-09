@@ -24,5 +24,5 @@ if(NOT WIN32)
 endif()
 
 add_subdirectory(TestInterfaces)
-add_subdirectory(tests)
+add_subdirectory(CppTests)
 add_subdirectory(PyTests)

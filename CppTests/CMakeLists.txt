@@ -15,7 +15,7 @@ else()
 endif()
 
 
-set(TEST_SOURCES
+set(CppTests_SOURCES
     Main.cpp
     AggregationTests.cpp
     BooleanTests.cpp
@@ -31,20 +31,20 @@ set(TEST_SOURCES
     StringTests.cpp
     )
 if(NOT WIN32)
-    list(APPEND TEST_SOURCES "../NonWindows.cpp")
+    list(APPEND CppTests_SOURCES "../NonWindows.cpp")
 endif()
 
-add_executable(MiniCOM_tests ${TEST_SOURCES})
+add_executable(CppTests ${CppTests_SOURCES})
 
-target_include_directories(MiniCOM_tests PRIVATE
+target_include_directories(CppTests PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}/.."
 )
 
-target_link_libraries(MiniCOM_tests PRIVATE TestInterfaces GTest::gtest)
+target_link_libraries(CppTests PRIVATE TestInterfaces GTest::gtest)
 
 # run test suite as post-build event
-add_custom_command(TARGET MiniCOM_tests POST_BUILD
-                   COMMAND $<TARGET_FILE:MiniCOM_tests>
+add_custom_command(TARGET CppTests POST_BUILD
+                   COMMAND $<TARGET_FILE:CppTests>
                    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
                    COMMENT "Running test suite")
