@@ -387,17 +387,21 @@ static constexpr GUID IID_IMessageFilter = {0x00000016,0x0000,0x0000,{0xC0,0x00,
 
 #if !defined(CINTERFACE)
 
-extern "C" {
 /** IUnknown base-class for non-Windows platforms. */
 struct IUnknown {
     /** Cast method. */
     virtual HRESULT QueryInterface (const GUID & iid, /*[out]*/void **obj) = 0;
 
+    /** Typed cast method. */
+    template <class Q>
+    HRESULT QueryInterface (Q ** obj) {
+        return QueryInterface(__uuidof(Q), reinterpret_cast<void**>(obj));
+    }
+
     /** Reference counting for lifetime management. */
     virtual ULONG AddRef () = 0;
     virtual ULONG Release () = 0;
 };
-} // extern "C"
 DEFINE_UUIDOF(IUnknown)
 
 #else // defined(CINTERFACE)
