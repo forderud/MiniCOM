@@ -159,12 +159,12 @@ def ParseCppQuote (source):
     '''Parse cpp_quote("...") statements'''
 
     def ReplaceFun (match):
-        substr = match.group(0)
-        substr = substr.replace('\\"', '"')
-        return substr[11:-2]
+        return match.group(1).replace('\\"', '"')
 
-    # pattern to match 'cpp_quote("...")'
-    pattern = re.compile('cpp_quote\\(".*"\\)')
+    # pattern to match 'cpp_quote("...")', capturing the quoted text. The body may
+    # contain escaped quotes, so match those explicitly rather than stopping at the
+    # first '"' -- and so that two statements on one line stay separate.
+    pattern = re.compile('cpp_quote\\("((?:[^"\\\\]|\\\\.)*)"\\)', re.DOTALL)
     source = pattern.sub(ReplaceFun, source)
     return source
 
