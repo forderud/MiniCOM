@@ -68,11 +68,9 @@ extern "C" void SetOaNoCache ();
 /** RAII class for COM initialization. */
 class ComInitialize {
 public:
-    ComInitialize (COINIT apartment /*= COINIT_MULTITHREADED*/) : m_initialized(false) {
+    ComInitialize (COINIT apartment /*= COINIT_MULTITHREADED*/) {
         // REF: https://docs.microsoft.com/en-us/windows/win32/api/combaseapi/nf-combaseapi-coinitializeex
-        HRESULT hr = CoInitializeEx(NULL, apartment);
-        if (SUCCEEDED(hr))
-            m_initialized = true;
+        m_hr = CoInitializeEx(NULL, apartment);
 
 #ifndef NDEBUG
         SetOaNoCache();
@@ -80,12 +78,18 @@ public:
     }
 
     ~ComInitialize () {
-        if (m_initialized)
-            CoUninitialize();
+        if (SUCCEEDED(m_hr))
+            CoUninitialize(); // only balance an initialization that succeeded
+    }
+
+    /** Result of CoInitializeEx, so the caller can tell RPC_E_CHANGED_MODE from a
+        genuine failure. Matches WRL's RoInitializeWrapper. */
+    operator HRESULT () const {
+        return m_hr;
     }
 
 private:
-    bool m_initialized; ///< must uninitialize in dtor
+    HRESULT m_hr = E_FAIL; ///< must uninitialize in dtor if SUCCEEDED
 };
 
 #else // _WIN32
@@ -101,7 +105,11 @@ enum COINIT {
 class ComInitialize {
 public:
     ComInitialize(COINIT apartment) {
-        (void)apartment;
+        (void)apartment; // no apartment model outside Windows
+    }
+
+    operator HRESULT () const {
+        return S_OK;
     }
 };
 
