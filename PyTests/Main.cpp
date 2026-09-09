@@ -27,16 +27,25 @@ public:
     }
 
     HRESULT GetValue (/*out*/int * value) override {
+        if (!value)
+            return E_INVALIDARG;
+
         *value = 42;
         return S_OK;
     }
 
     HRESULT Add (int a, int b, /*out*/int * result) override {
+        if (!result)
+            return E_INVALIDARG;
+
         *result = a + b;
         return S_OK;
     }
 
     HRESULT GetValue2 (/*out*/int * value) override {
+        if (!value)
+            return E_INVALIDARG;
+
         *value = 43;
         return S_OK;
     }
