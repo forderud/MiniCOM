@@ -190,13 +190,10 @@ def ParseSafeArray (source):
 
 def ParseImport (source):
     '''Modify import "..." statements'''
-    global last_import, found_lib
-    last_import = 0
-    found_lib = False
-    
+    state = {'last_import': 0, 'found_lib': False}
+
     def ReplaceFun (match):
-        global last_import
-        last_import = match.start()
+        state['last_import'] = match.start()
         substr = match.group(0)
         filename = substr[substr.find('"')+1:substr.rfind('"')]
         if filename.lower() in ['oaidl.idl', 'ocidl.idl']:
@@ -216,21 +213,21 @@ def ParseImport (source):
     source = pattern.sub(RemoveFun, source)
     
     def RemoveLibFun (match):
-        global found_lib
-        found_lib = True
+        state['found_lib'] = True
         return ''
     
     # remove 'library XXX {'
     pattern = re.compile('library [a-zA-Z0-9_\\.]+\\s*{')
     source = pattern.sub(RemoveLibFun, source)
     
-    if found_lib:
+    if state['found_lib']:
         # remove '};' at end of library scope
         idx = source.rfind('};')
         source = source[:idx] + source[idx+2:]
     
+    last_import = state['last_import']
     last_import += source[last_import:].find('\n') # start of line after last import
-    
+
     return source, last_import
 
 
