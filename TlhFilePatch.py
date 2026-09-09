@@ -330,3 +330,4 @@ if __name__ == "__main__":
     
     PatchTlhFile(tlh_file_in, tlh_file_out, tli_file_in, remove_header, cross_platorm)
     PatchTliFile(tli_file_in, tli_file_out, remove_header, cross_platorm)
+    UpdateCallingConventions(tlh_file_out)

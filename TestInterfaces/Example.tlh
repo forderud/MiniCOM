@@ -70,7 +70,7 @@ ICalcCb : IUnknown
     // Raw methods provided by interface
     //
 
-      virtual HRESULT __stdcall raw_Message (
+      virtual HRESULT  raw_Message (
         /*[in]*/ BSTR Message ) = 0;
 };
 
@@ -102,7 +102,7 @@ ICalc : IUnknown
     // Raw methods provided by interface
     //
 
-      virtual HRESULT __stdcall raw_GetValue (
+      virtual HRESULT  raw_GetValue (
         /*[out,retval]*/ int * value ) = 0;
 };
 
@@ -126,11 +126,11 @@ ICalcExt : ICalc
     // Raw methods provided by interface
     //
 
-      virtual HRESULT __stdcall raw_Add (
+      virtual HRESULT  raw_Add (
         /*[in]*/ int a,
         /*[in]*/ int b,
         /*[out,retval]*/ int * result ) = 0;
-      virtual HRESULT __stdcall raw_SetCallback (
+      virtual HRESULT  raw_SetCallback (
         /*[in]*/ struct ICalcCb * cb ) = 0;
 };
 
@@ -150,7 +150,7 @@ ICalc2 : IUnknown
     // Raw methods provided by interface
     //
 
-      virtual HRESULT __stdcall raw_GetValue2 (
+      virtual HRESULT  raw_GetValue2 (
         /*[out,retval]*/ int * value ) = 0;
 };
 
