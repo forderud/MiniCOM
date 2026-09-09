@@ -212,18 +212,26 @@ def ParseImport (source):
     pattern = re.compile('importlib\\("[a-zA-Z0-9_\\.]+?"\\);')
     source = pattern.sub(RemoveFun, source)
     
-    def RemoveLibFun (match):
-        state['found_lib'] = True
-        return ''
-    
-    # remove 'library XXX {'
+    # remove 'library XXX { ... };', keeping the declarations inside it
     pattern = re.compile('library [a-zA-Z0-9_\\.]+\\s*{')
-    source = pattern.sub(RemoveLibFun, source)
-    
-    if state['found_lib']:
-        # remove '};' at end of library scope
-        idx = source.rfind('};')
-        source = source[:idx] + source[idx+2:]
+    opening = pattern.search(source)
+    if opening:
+        # scan for the brace that closes the library rather than assuming it is the
+        # last '};' in the file, which is only true when nothing follows the block
+        depth, close = 1, None
+        for i in range(opening.end(), len(source)):
+            if source[i] == '{':
+                depth += 1
+            elif source[i] == '}':
+                depth -= 1
+                if depth == 0:
+                    close = i
+                    break
+        if close is None:
+            raise Exception('unterminated library block in ' + repr(opening.group(0)))
+
+        end = close + 2 if source[close:close+2] == '};' else close + 1
+        source = source[:opening.start()] + source[opening.end():close] + source[end:]
     
     last_import = state['last_import']
     last_import += source[last_import:].find('\n') # start of line after last import
