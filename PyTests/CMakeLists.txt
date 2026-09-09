@@ -25,16 +25,23 @@ target_link_libraries(PyTests PUBLIC
         pybind11::headers
         )
 
-# run python test script as post-build event
+# run python test script after build, and whenever tests.py changes
+set(TEST_STAMP "${CMAKE_CURRENT_BINARY_DIR}/tests.stamp")
 if(WIN32)
-    add_custom_command(TARGET PyTests POST_BUILD
+    add_custom_command(OUTPUT ${TEST_STAMP}
         COMMAND set PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}\\$<IF:$<CONFIG:Debug>,Debug,Release>
         COMMAND py tests.py
+        COMMAND ${CMAKE_COMMAND} -E touch ${TEST_STAMP}
+        DEPENDS tests.py PyTests
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         COMMENT "Running python tests")
 else()
-    add_custom_command(TARGET PyTests POST_BUILD
+    add_custom_command(OUTPUT ${TEST_STAMP}
         COMMAND PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR} ${Python_EXECUTABLE} tests.py
+        COMMAND ${CMAKE_COMMAND} -E touch ${TEST_STAMP}
+        DEPENDS tests.py PyTests
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         COMMENT "Running python tests")
 endif()
+add_custom_target(PyTests_run ALL DEPENDS ${TEST_STAMP})
+add_dependencies(PyTests_run PyTests) # ensure PyTests.pyd exists before the script runs
