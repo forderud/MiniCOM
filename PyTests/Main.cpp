@@ -19,11 +19,11 @@ class Calculator :
     public ICalcExt, public ICalc2 {
 public:
     Calculator() {
-        printf("Calculator ctor.\n");
+        py::print("Calculator ctor.\n");
     }
 
     ~Calculator() {
-        printf("Calculator dtor.\n");
+        py::print("Calculator dtor.\n");
     }
 
     HRESULT GetValue (/*out*/int * value) override {
