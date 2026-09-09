@@ -22,7 +22,6 @@ struct
 __declspec(uuid("69b1a795-7579-4dac-8fc9-72d410e346d3"))
 #endif
 /* interface */ ICalcCb;
-struct __MIDL___MIDL_itf_Example_0006_0001_0001;
 struct 
 #ifdef _WIN32
 __declspec(uuid("9e91b361-831f-4857-82f7-347a8592c70b"))
@@ -38,7 +37,6 @@ struct
 __declspec(uuid("d8ac9315-ce17-4268-911f-18f5f2135b7f"))
 #endif
 /* interface */ ICalc2;
-typedef struct __MIDL___MIDL_itf_Example_0006_0001_0001 GUID;
 
 //
 // Smart pointer typedef declarations
@@ -73,18 +71,6 @@ ICalcCb : IUnknown
       virtual HRESULT  raw_Message (
         /*[in]*/ BSTR Message ) = 0;
 };
-
-#pragma pack(push, 4)
-
-struct __MIDL___MIDL_itf_Example_0006_0001_0001
-{
-    unsigned long Data1;
-    unsigned short Data2;
-    unsigned short Data3;
-    unsigned char Data4[8];
-};
-
-#pragma pack(pop)
 
 struct 
 #ifdef _WIN32

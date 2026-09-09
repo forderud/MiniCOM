@@ -1,5 +1,5 @@
 /* Interfaces for test purposes. */
-import "oaidl.idl";
+import "ocidl.idl";
 
 
 [object,
