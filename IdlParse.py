@@ -10,12 +10,8 @@ VERBOSE = False #True
 
 
 def RemoveMidPragmas (source):
-    result = ''
-    for line in source.splitlines():
-        if 'midl_pragma' in line:
-            continue # skip line
-        result += line + '\n'
-    return result
+    lines = [l for l in source.splitlines() if 'midl_pragma' not in l]
+    return ''.join(l + '\n' for l in lines)
 
 def ExtractComments (source, comments):
     '''Extract comments & replace them with a hash value'''
