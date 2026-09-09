@@ -50,6 +50,10 @@ public:
         return S_OK;
     }
 
+    HRESULT SetCallback(ICalcCb* cb) override {
+        return E_NOTIMPL;
+    }
+
     BEGIN_COM_MAP(Calculator)
         COM_INTERFACE_ENTRY(ICalc)
         COM_INTERFACE_ENTRY(ICalcExt)

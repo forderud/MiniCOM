@@ -31,6 +31,10 @@ public:
         return S_OK;
     }
 
+    HRESULT SetCallback(ICalcCb* /*cb*/) override {
+        return E_NOTIMPL;
+    }
+
     HRESULT GetValue2 (/*out*/int * value) override {
         if (!value)
             return E_INVALIDARG;
