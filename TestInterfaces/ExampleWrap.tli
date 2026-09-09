@@ -13,6 +13,16 @@ inline int ICalc::GetValue ( ) {
 }
 
 //
+// interface ICalcCb wrapper method implementations
+//
+
+inline HRESULT ICalcCb::Message ( _bstr_t Message ) {
+    HRESULT _hr = raw_Message(Message);
+    if (FAILED(_hr)) _com_issue_errorex(_hr, this, __uuidof(std::remove_reference_t<decltype(*this)>));
+    return _hr;
+}
+
+//
 // interface ICalcExt wrapper method implementations
 //
 
@@ -21,6 +31,12 @@ inline int ICalcExt::Add ( int a, int b ) {
     HRESULT _hr = raw_Add(a, b, &_result);
     if (FAILED(_hr)) _com_issue_errorex(_hr, this, __uuidof(std::remove_reference_t<decltype(*this)>));
     return _result;
+}
+
+inline HRESULT ICalcExt::SetCallback ( struct ICalcCb * cb ) {
+    HRESULT _hr = raw_SetCallback(cb);
+    if (FAILED(_hr)) _com_issue_errorex(_hr, this, __uuidof(std::remove_reference_t<decltype(*this)>));
+    return _hr;
 }
 
 //

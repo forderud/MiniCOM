@@ -19,10 +19,17 @@ public:
         return S_OK;
     }
 
+    HRESULT raw_SetCallback (ExampleLib::ICalcCb * cb) override {
+        m_callback = cb;
+        return S_OK;
+    }
+
     HRESULT raw_GetValue2 (/*out*/int * value) override {
         *value = 43;
         return S_OK;
     }
+
+    ExampleLib::ICalcCbPtr m_callback;
 
     BEGIN_COM_MAP(WrapCalculator)
         COM_INTERFACE_ENTRY(ExampleLib::ICalc)
