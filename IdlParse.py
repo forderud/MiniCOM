@@ -17,12 +17,11 @@ def ExtractComments (source, comments):
     '''Extract comments & replace them with a hash value'''
 
     def ReplaceFun (match):
-        beginidx, endidx = match.regs[0]
-        substr = source[beginidx:endidx]
+        substr = match.group(0)
 
-        hash = hashlib.md5(substr.encode()).hexdigest()
-        comments[hash] = substr
-        return hash
+        digest = hashlib.md5(substr.encode()).hexdigest()
+        comments[digest] = substr
+        return digest
 
     # pattern that detects multi-line "/*...*/" strings non-greedy
     pattern = re.compile('/\\*.*?\\*/', re.DOTALL)
@@ -38,12 +37,11 @@ def ExtractStrings (source, comments):
     '''Extract text strings & replace them with a hash value'''
 
     def ReplaceFun (match):
-        beginidx, endidx = match.regs[0]
-        substr = source[beginidx:endidx]
+        substr = match.group(0)
 
-        hash = hashlib.md5(substr.encode()).hexdigest()
-        comments[hash] = substr
-        return hash
+        digest = hashlib.md5(substr.encode()).hexdigest()
+        comments[digest] = substr
+        return digest
 
     # pattern that detects "..." strings that might contain escape characters
     pattern = re.compile('"([^"\\\\]|\\\\.)*"')
@@ -72,13 +70,12 @@ def ParseAttributes (source):
     interfaces = []
 
     def ReplaceFun (match):
-        beginidx, endidx = match.regs[0]
-        substr = source[beginidx:endidx]
+        substr = match.group(0)
 
         uuid_statement = ''
         if 'uuid(' in substr:
             # identify which struct/interface the uuid belongs to
-            later_tokens = source[endidx:].split()
+            later_tokens = source[match.end():].split()
             if later_tokens[0] == 'interface':
                 interface = later_tokens[1] # interface name
                 # identify UUID
@@ -113,8 +110,7 @@ def ParseInterfaces (source):
     '''Parse IDL interface statements'''
 
     def ReplaceFun1 (match):
-        beginidx, endidx = match.regs[0]
-        substr = source[beginidx:endidx]
+        substr = match.group(0)
         # rename 'interface' to 'struct'
         substr = substr.replace('interface', 'struct', 1)
         # add public inheritance
@@ -125,8 +121,7 @@ def ParseInterfaces (source):
     source = pattern.sub(ReplaceFun1, source)
 
     def ReplaceFun2 (match):
-        beginidx, endidx = match.regs[0]
-        substr = source[beginidx:endidx]
+        substr = match.group(0)
         # add 'virtual' to signature
         substr = substr.replace('HRESULT', 'virtual HRESULT', 1)
         # add '= 0' after signature
@@ -143,8 +138,7 @@ def ParseInterfaces (source):
     source = pattern.sub('', source) # remove matches
     
     def ReplaceFun3 (match):
-        beginidx, endidx = match.regs[0]
-        substr = source[beginidx:endidx]
+        substr = match.group(0)
         # rename 'interface' to 'struct'
         return substr.replace('interface', 'struct', 1)
     
@@ -160,8 +154,7 @@ def ParseCppQuote (source):
     '''Parse cpp_quote("...") statements'''
 
     def ReplaceFun (match):
-        beginidx, endidx = match.regs[0]
-        substr = source[beginidx:endidx]
+        substr = match.group(0)
         substr = substr.replace('\\"', '"')
         return substr[11:-2]
 
@@ -175,8 +168,7 @@ def ParseSafeArray (source):
     '''Parse SAFEARRAY(T) statements'''
 
     def ReplaceFun (match):
-        beginidx, endidx = match.regs[0]
-        substr = source[beginidx:endidx]
+        substr = match.group(0)
         if VERBOSE:
             substr = substr.replace('(', '/*(')
             substr = substr.replace(')', ')*/')
@@ -199,9 +191,8 @@ def ParseImport (source):
     
     def ReplaceFun (match):
         global last_import
-        beginidx, endidx = match.regs[0]
-        last_import = beginidx
-        substr = source[beginidx:endidx]
+        last_import = match.start()
+        substr = match.group(0)
         filename = substr[substr.find('"')+1:substr.rfind('"')]
         if filename.lower() in ['oaidl.idl', 'ocidl.idl']:
             return '' # remove import
