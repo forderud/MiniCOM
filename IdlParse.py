@@ -194,7 +194,7 @@ def ParseSafeArray (source):
 
 def ParseImport (source):
     '''Modify import "..." statements'''
-    state = {'last_import': 0, 'found_lib': False}
+    state = {'last_import': 0}
 
     def ReplaceFun (match):
         state['last_import'] = match.start()
@@ -216,18 +216,27 @@ def ParseImport (source):
     pattern = re.compile('importlib\\("[a-zA-Z0-9_\\.]+?"\\);')
     source = pattern.sub(RemoveFun, source)
     
-    def RemoveLibFun (match):
-        state['found_lib'] = True
-        return ''
-    
     # remove 'library XXX {'
     pattern = re.compile('library [a-zA-Z0-9_\\.]+\\s*{')
-    source = pattern.sub(RemoveLibFun, source)
-    
-    if state['found_lib']:
-        # remove '};' at end of library scope
-        idx = source.rfind('};')
-        source = source[:idx] + source[idx+2:]
+    match = pattern.search(source)
+    if match:
+        # find the '}' that closes the library scope, which is not
+        # necessarily the last '};' in the file
+        depth = 1
+        idx = match.end()
+        while depth > 0:
+            if source[idx] == '{':
+                depth += 1
+            elif source[idx] == '}':
+                depth -= 1
+            idx += 1
+        close = idx-1
+
+        # also remove the ';' after the '}'
+        if source[idx:idx+1] == ';':
+            idx += 1
+
+        source = source[:match.start()] + source[match.end():close] + source[idx:]
     
     last_import = state['last_import']
     last_import += source[last_import:].find('\n') # start of line after last import
