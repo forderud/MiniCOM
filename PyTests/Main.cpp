@@ -70,7 +70,7 @@ namespace PYBIND11_NAMESPACE {
         /** Work-around for missing a .get() method in CComPtr<T>. */
         template <typename T>
         struct holder_helper<CComPtr<T>> { // <-- specialization
-            static const T* get(const CComPtr<T>& p) {
+            static T* get(const CComPtr<T>& p) {
                 return p;
             }
         };
