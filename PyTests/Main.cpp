@@ -74,7 +74,9 @@ private:
 
 
 /** Trampoline class for Python callbacks. */
-class PyICalcCb : public ICalcCb {
+class PyICalcCb :
+    public CComObjectRootEx<CComMultiThreadModel>, // also compatible with STA
+    public ICalcCb {
 public:
     PyICalcCb() {
         py::print("PyICalcCb ctor.\n");
@@ -93,36 +95,9 @@ public:
         );
     }
 
-    HRESULT QueryInterface(const GUID& iid, /*out*/void** obj) override {
-        if (!obj)
-            return E_POINTER;
-
-        if (iid == __uuidof(IUnknown)) {
-            *obj = static_cast<IUnknown*>(this);
-        } else if (iid == __uuidof(ICalcCb)) {
-            *obj = static_cast<ICalcCb*>(this);
-        } else {
-            return E_NOINTERFACE;
-        }
-
-        AddRef();
-        return S_OK;
-    }
-
-    ULONG AddRef() override {
-        assert((m_ref < 0xFFFF) && "IUnknown::AddRef negative ref count.");
-        return ++m_ref;
-    }
-    ULONG Release() override {
-        ULONG ref = --m_ref;
-        assert((m_ref < 0xFFFF) && "IUnknown::Release negative ref count.");
-        if (!ref)
-            delete this;
-        return ref;
-    }
-
-private:
-    std::atomic<int> m_ref{ 0 };
+    BEGIN_COM_MAP(PyICalcCb)
+        COM_INTERFACE_ENTRY(ICalcCb)
+    END_COM_MAP()
 };
 
 /** Declare CComPtr<T> as smart-pointer type. */
@@ -176,9 +151,10 @@ PYBIND11_MODULE(PyTests, m, py::mod_gil_not_used()) {
     /** Bind ICalcCb. */
     py::class_<ICalcCb, CComPtr<ICalcCb>>(m, "ICalcCb")
         .def(py::init([]() {
-            // return a raw pointer: pybind11 then constructs the holder itself,
-            // which takes the reference and avoids taking the holder's address
-            return new PyICalcCb();
+            // CComObject starts at zero references; pybind11's holder then takes one
+            CComObject<PyICalcCb>* obj = nullptr;
+            CHECK(CComObject<PyICalcCb>::CreateInstance(&obj));
+            return static_cast<ICalcCb*>(obj);
             }))
         .def("Message", [](ICalcCb& self, BSTR msg) {
             CHECK(self.Message(msg));
