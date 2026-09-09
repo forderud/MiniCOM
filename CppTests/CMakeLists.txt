@@ -21,6 +21,7 @@ set(CppTests_SOURCES
     BooleanTests.cpp
     ComClassTests.cpp
     ComErrorTests.cpp
+    ComObjectTests.cpp
     ComPtrTests.cpp
     DynamicCastTests.cpp
     ExampleTests.cpp
@@ -31,7 +32,9 @@ set(CppTests_SOURCES
     StringTests.cpp
     )
 if(NOT WIN32)
-    list(APPEND CppTests_SOURCES "../NonWindows.cpp")
+    # ComCreateTests uses OBJECT_ENTRY_AUTO and IUnknownFactory, which are the
+    # non-Windows object-creation path. Windows uses ole32 and the registry.
+    list(APPEND CppTests_SOURCES "../NonWindows.cpp" ComCreateTests.cpp)
 endif()
 
 add_executable(CppTests ${CppTests_SOURCES})
