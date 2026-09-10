@@ -63,11 +63,14 @@ def ReplaceComments (source, comments):
     return source
 
 
+def FindUuidString (attributes):
+    '''Return the uuid of an IDL '[...uuid(FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF)...]' attribute'''
+    uuid = attributes[attributes.find('uuid(')+5:]
+    return uuid[:uuid.find(')')]
+
 def ParseUuidString (str):
     '''Return uuid string on {0xFFFFFFFF,0xFFFF,0xFFFF,{0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF}} form'''
-    # identify UUID
-    uuid = str[str.find('uuid(')+5:]
-    uuid = ''.join(uuid[:uuid.find(')')].split('-'))
+    uuid = ''.join(FindUuidString(str).split('-'))
     uuid = '{0x'+uuid[:8]+',0x'+uuid[8:12]+',0x'+uuid[12:16]+',{0x'+uuid[16:18]+',0x'+uuid[18:20]+',0x'+uuid[20:22]+',0x'+uuid[22:24]+',0x'+uuid[24:26]+',0x'+uuid[26:28]+',0x'+uuid[28:30]+',0x'+uuid[30:32]+'}}'
     return uuid
 
