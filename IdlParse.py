@@ -114,7 +114,13 @@ def ParseAttributes (source):
 
 
 def ParseInterfaces (source):
-    '''Parse IDL interface statements'''
+    '''Parse IDL interface statements.
+
+    Also returns what the patterns below already match, as
+    [(name, base, header, [(method, arglist), ...]), ...] in declaration order,
+    so that the vtable definitions do not need to parse the result again.
+    '''
+    interfaces = []
 
     def ReplaceFun1 (match):
         beginidx, endidx = match.regs[0]
@@ -122,15 +128,21 @@ def ParseInterfaces (source):
         # rename 'interface' to 'struct'
         substr = substr.replace('interface', 'struct', 1)
         # add public inheritance
-        return substr.replace(':', ': public', 1)
+        substr = substr.replace(':', ': public', 1)
+        interfaces.append((match.group(1), match.group(2), substr, []))
+        return substr
 
     # pattern to match 'interface ABC : IUnknown {'
-    pattern = re.compile('interface\\s*[a-zA-Z0-9_]+?\\s*:\\s*[a-zA-Z0-9_]+\\s*{')
+    pattern = re.compile('interface\\s*([a-zA-Z0-9_]+?)\\s*:\\s*([a-zA-Z0-9_]+)\\s*{')
     source = pattern.sub(ReplaceFun1, source)
 
     def ReplaceFun2 (match):
         beginidx, endidx = match.regs[0]
         substr = source[beginidx:endidx]
+        # attribute the method to the interface it is declared in
+        idx = source.count(': public', 0, beginidx)-1
+        if idx >= 0:
+            interfaces[idx][3].append((match.group(1), match.group(2)))
         # add 'virtual' to signature
         substr = substr.replace('HRESULT', 'virtual HRESULT', 1)
         # add '= 0' after signature
@@ -138,7 +150,7 @@ def ParseInterfaces (source):
         return substr
 
     # pattern to match 'HRESULT Fun (....);' method signatures
-    pattern2 = re.compile('HRESULT \\s*[a-zA-Z0-9_]+?\\s*\\(.*?\\)\\s*;', re.DOTALL)
+    pattern2 = re.compile('HRESULT \\s*([a-zA-Z0-9_]+?)\\s*\\((.*?)\\)\\s*;', re.DOTALL)
     source = pattern2.sub(ReplaceFun2, source)
             
     # pattern to match 'coclass ABC {...};'
@@ -157,7 +169,7 @@ def ParseInterfaces (source):
     pattern = re.compile('interface\\s*[a-zA-Z0-9_]+?\\s*;')
     source = pattern.sub(ReplaceFun3, source)
     
-    return source
+    return source, interfaces
 
 
 def ParseCppQuote (source):
@@ -242,6 +254,104 @@ def ParseImport (source):
     return source, last_import
 
 
+def SplitParameters (arglist):
+    '''Split a C++ parameter list on top-level commas.'''
+    params = []
+    depth = 0
+    current = ''
+    for ch in arglist:
+        if ch in '([<':
+            depth += 1
+        elif ch in ')]>':
+            depth -= 1
+        if ch == ',' and depth == 0:
+            params.append(current)
+            current = ''
+        else:
+            current += ch
+    if current.strip():
+        params.append(current)
+    return [p.strip() for p in params if p.strip()]
+
+
+def GenerateForwardDeclarations (interfaces):
+    '''Forward declare every interface, the way MIDL does.
+
+    Lets an interface refer to one that is declared further down the file,
+    without depending on the order they appear in.
+    '''
+    out = ''
+    for name in interfaces:
+        out += 'typedef struct '+name+' '+name+';\n'
+    return out+'\n'
+
+
+def GenerateCInterfaces (source, interfaces):
+    '''Add C style vtable definitions next to the C++ interface definitions.
+
+    Matches the IUnknown/IUnknownVtbl pair in NonWindows.hpp: the C++ interface
+    by default, and a vtable struct with an "lpVtbl" object when CINTERFACE is
+    defined. Both describe the same vtable, so a client can pick either form.
+    '''
+    methods_of = {name: methods for name, _, _, methods in interfaces}
+    base_of    = {name: base for name, base, _, _ in interfaces}
+
+    def AllMethods (name):
+        '''Own methods, preceded by every inherited one, in vtable order.'''
+        base = base_of.get(name)
+        inherited = AllMethods(base) if base and base != 'IUnknown' else []
+        return inherited+methods_of.get(name, [])
+
+    def BaseIsVisible (name):
+        base = base_of.get(name)
+        if not base or base == 'IUnknown':
+            return True
+        return base in methods_of and BaseIsVisible(base)
+
+    def FindStruct (source, header):
+        '''Span of the struct starting with "header", including the trailing ";".'''
+        begin = source.index(header)
+        depth = 1
+        idx = begin+len(header)
+        while depth > 0:
+            if source[idx] == '{':
+                depth += 1
+            elif source[idx] == '}':
+                depth -= 1
+            idx += 1
+        return begin, source.index(';', idx)+1
+
+    # back to front, so that the offsets of earlier interfaces still apply
+    for name, base, header, _ in reversed(interfaces):
+        if not BaseIsVisible(name):
+            # skip interface that inherits unknown interface
+            continue
+
+        begin, end = FindStruct(source, header)
+
+        vtbl = ''
+        vtbl += '#if !defined(CINTERFACE)\n'
+        vtbl += source[begin:end]
+        vtbl += '\n#else // defined(CINTERFACE)\n\n'
+        vtbl += 'typedef struct '+name+'Vtbl {\n'
+        vtbl += '    HRESULT (*QueryInterface)('+name+'* This, const GUID& iid, void** obj);\n'
+        vtbl += '    ULONG   (*AddRef)('+name+'* This);\n'
+        vtbl += '    ULONG   (*Release)('+name+'* This);\n'
+        for method, arglist in AllMethods(name):
+            params = SplitParameters(arglist)
+            vtbl += '    HRESULT (*'+method+')('+name+'* This'
+            vtbl += ''.join(', '+p for p in params)+');\n'
+        vtbl += '} '+name+'Vtbl;\n\n'
+        vtbl += 'struct '+name+' {\n'
+        vtbl += '    struct '+name+'Vtbl* lpVtbl;\n'
+        vtbl += '};\n'
+        vtbl += '#endif\n'
+
+        source = source[:begin]+vtbl+source[end:]
+
+    return source
+
+
 def ParseIdlFile (idl_file, h_file, c_file):
     with open(idl_file, 'r') as f:
         source = f.read()
@@ -252,8 +362,9 @@ def ParseIdlFile (idl_file, h_file, c_file):
     source = ExtractStrings(source, comments)
     source = ExtractComments(source, comments)
     source, interfaces = ParseAttributes(source)
-    source = ParseInterfaces(source)
+    source, definitions = ParseInterfaces(source)
     source = ParseSafeArray(source)
+    source = GenerateCInterfaces(source, definitions)
     source = ReplaceComments(source, comments)
     source, last_import = ParseImport(source)
     source = ParseCppQuote(source)
@@ -263,6 +374,7 @@ def ParseIdlFile (idl_file, h_file, c_file):
         f.write('#pragma once\n')
         f.write(source[:last_import]+'\n')
         f.write('extern "C" {\n')
+        f.write(GenerateForwardDeclarations(interfaces))
         f.write(source[last_import:]+'\n')
         f.write('} //extern "C"\n')
         for interface in interfaces:
