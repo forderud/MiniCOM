@@ -28,3 +28,10 @@ add_custom_command(
 add_custom_target(ExampleBindings DEPENDS ${PY_BINDINGS})
 add_dependencies(ExampleBindings TestInterfaces) # for Example.json
 add_dependencies(ExampleLib ExampleBindings)
+
+
+# run python test script as post-build event
+add_custom_command(TARGET ExampleLib POST_BUILD
+    COMMAND PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR} ${Python_EXECUTABLE} tests.py $<TARGET_FILE:ExampleLib>
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMENT "Running python tests")
