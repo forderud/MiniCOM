@@ -14,16 +14,16 @@ PyTestsAtlModule _AtlModule;
 
 
 /** C++ COM class to be called from Python. */
-class Calculator :
+class CalculatorImpl :
     public CComObjectRootEx<CComMultiThreadModel>, // also compatible with STA
-    public CComCoClass<Calculator>, // no CLSID needed
+    public CComCoClass<CalculatorImpl>, // no CLSID needed
     public ICalcExt, public ICalc2 {
 public:
-    Calculator() {
+    CalculatorImpl() {
         py::print("Calculator ctor.\n");
     }
 
-    ~Calculator() {
+    ~CalculatorImpl() {
         py::print("Calculator dtor.\n");
     }
 
@@ -63,7 +63,7 @@ public:
         return S_OK;
     }
 
-    BEGIN_COM_MAP(Calculator)
+    BEGIN_COM_MAP(CalculatorImpl)
         COM_INTERFACE_ENTRY(ICalc)
         COM_INTERFACE_ENTRY(ICalcExt)
         COM_INTERFACE_ENTRY(ICalc2)
@@ -174,7 +174,7 @@ PYBIND11_MODULE(PyTests, m, py::mod_gil_not_used()) {
 
     /** Factory function. */
     m.def("CreateCalculator", []() {
-        CComPtr<Calculator> calculator = CreateLocalInstance<Calculator>();
+        CComPtr<CalculatorImpl> calculator = CreateLocalInstance<CalculatorImpl>();
         CComPtr<ICalcExt> ptr;
         CHECK(calculator->QueryInterface(__uuidof(ICalcExt), (void**)&ptr));
         return ptr;
