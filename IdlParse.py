@@ -1,7 +1,6 @@
 # Simple Microsoft IDL parser.
 # Generates cross-platform compatible C++ headers from Microsoft IDL files.
 
-import hashlib
 import os
 import re
 import sys
@@ -17,16 +16,24 @@ def RemoveMidPragmas (source):
         result += line + '\n'
     return result
 
-def ExtractComments (source, comments):
-    '''Extract comments & replace them with a hash value'''
+#: Placeholder wrapper for masked text. Uses control characters so a placeholder
+#: can never be produced by, or matched as part of, an IDL identifier.
+MASK_BEGIN = '\x01'
+MASK_END   = '\x02'
+MASK_PATTERN = re.compile(MASK_BEGIN + r'(\d+)' + MASK_END)
+
+
+def Mask (substr, masked):
+    '''Stash substr and return a placeholder that no later pattern can match'''
+    masked.append(substr)
+    return MASK_BEGIN + str(len(masked) - 1) + MASK_END
+
+
+def ExtractComments (source, masked):
+    '''Replace comments with placeholders'''
 
     def ReplaceFun (match):
-        beginidx, endidx = match.regs[0]
-        substr = source[beginidx:endidx]
-
-        hash = hashlib.md5(substr.encode()).hexdigest()
-        comments[hash] = substr
-        return hash
+        return Mask(match.group(0), masked)
 
     # pattern that detects multi-line "/*...*/" strings non-greedy
     pattern = re.compile('/\\*.*?\\*/', re.DOTALL)
@@ -38,16 +45,11 @@ def ExtractComments (source, comments):
     return source
 
 
-def ExtractStrings (source, comments):
-    '''Extract text strings & replace them with a hash value'''
+def ExtractStrings (source, masked):
+    '''Replace text strings with placeholders'''
 
     def ReplaceFun (match):
-        beginidx, endidx = match.regs[0]
-        substr = source[beginidx:endidx]
-
-        hash = hashlib.md5(substr.encode()).hexdigest()
-        comments[hash] = substr
-        return hash
+        return Mask(match.group(0), masked)
 
     # pattern that detects "..." strings that might contain escape characters
     pattern = re.compile('"([^"\\\\]|\\\\.)*"')
@@ -55,11 +57,12 @@ def ExtractStrings (source, comments):
     return source
 
 
-def ReplaceComments (source, comments):
-    '''Substitute hash values back with their original text strings'''
-    for i in range(2): # two passes to account for nested comments
-        for key in comments:
-            source = source.replace(key, comments[key])
+def ReplaceComments (source, masked):
+    '''Substitute placeholders back with their original text'''
+    # a masked comment can contain a placeholder for a string masked earlier, so
+    # keep expanding until nothing is left rather than assuming a fixed depth
+    while MASK_PATTERN.search(source):
+        source = MASK_PATTERN.sub(lambda m: masked[int(m.group(1))], source)
     return source
 
 
@@ -76,13 +79,12 @@ def ParseAttributes (source):
     interfaces = []
 
     def ReplaceFun (match):
-        beginidx, endidx = match.regs[0]
-        substr = source[beginidx:endidx]
+        substr = match.group(0)
 
         uuid_statement = ''
         if 'uuid(' in substr:
             # identify which struct/interface the uuid belongs to
-            later_tokens = source[endidx:].split()
+            later_tokens = source[match.end():].split()
             if later_tokens[0] == 'interface':
                 interface = later_tokens[1] # interface name
                 # identify UUID
@@ -117,8 +119,7 @@ def ParseInterfaces (source):
     '''Parse IDL interface statements'''
 
     def ReplaceFun1 (match):
-        beginidx, endidx = match.regs[0]
-        substr = source[beginidx:endidx]
+        substr = match.group(0)
         # rename 'interface' to 'struct'
         substr = substr.replace('interface', 'struct', 1)
         # add public inheritance
@@ -129,8 +130,7 @@ def ParseInterfaces (source):
     source = pattern.sub(ReplaceFun1, source)
 
     def ReplaceFun2 (match):
-        beginidx, endidx = match.regs[0]
-        substr = source[beginidx:endidx]
+        substr = match.group(0)
         # add 'virtual' to signature
         substr = substr.replace('HRESULT', 'virtual HRESULT', 1)
         # add '= 0' after signature
@@ -147,8 +147,7 @@ def ParseInterfaces (source):
     source = pattern.sub('', source) # remove matches
     
     def ReplaceFun3 (match):
-        beginidx, endidx = match.regs[0]
-        substr = source[beginidx:endidx]
+        substr = match.group(0)
         # rename 'interface' to 'struct'
         return substr.replace('interface', 'struct', 1)
     
@@ -164,8 +163,7 @@ def ParseCppQuote (source):
     '''Parse cpp_quote("...") statements'''
 
     def ReplaceFun (match):
-        beginidx, endidx = match.regs[0]
-        substr = source[beginidx:endidx]
+        substr = match.group(0)
         substr = substr.replace('\\"', '"')
         return substr[11:-2]
 
@@ -179,8 +177,7 @@ def ParseSafeArray (source):
     '''Parse SAFEARRAY(T) statements'''
 
     def ReplaceFun (match):
-        beginidx, endidx = match.regs[0]
-        substr = source[beginidx:endidx]
+        substr = match.group(0)
         if VERBOSE:
             substr = substr.replace('(', '/*(')
             substr = substr.replace(')', ')*/')
@@ -197,15 +194,11 @@ def ParseSafeArray (source):
 
 def ParseImport (source):
     '''Modify import "..." statements'''
-    global last_import, found_lib
-    last_import = 0
-    found_lib = False
-    
+    state = {'last_import': 0, 'found_lib': False}
+
     def ReplaceFun (match):
-        global last_import
-        beginidx, endidx = match.regs[0]
-        last_import = beginidx
-        substr = source[beginidx:endidx]
+        state['last_import'] = match.start()
+        substr = match.group(0)
         filename = substr[substr.find('"')+1:substr.rfind('"')]
         if filename.lower() in ['oaidl.idl', 'ocidl.idl']:
             return '' # remove import
@@ -224,21 +217,21 @@ def ParseImport (source):
     source = pattern.sub(RemoveFun, source)
     
     def RemoveLibFun (match):
-        global found_lib
-        found_lib = True
+        state['found_lib'] = True
         return ''
     
     # remove 'library XXX {'
     pattern = re.compile('library [a-zA-Z0-9_\\.]+\\s*{')
     source = pattern.sub(RemoveLibFun, source)
     
-    if found_lib:
+    if state['found_lib']:
         # remove '};' at end of library scope
         idx = source.rfind('};')
         source = source[:idx] + source[idx+2:]
     
+    last_import = state['last_import']
     last_import += source[last_import:].find('\n') # start of line after last import
-    
+
     return source, last_import
 
 
@@ -247,14 +240,14 @@ def ParseIdlFile (idl_file, h_file, c_file):
         source = f.read()
 
     # parse IDL file
-    comments = {}
+    masked = []
     source = RemoveMidPragmas(source)
-    source = ExtractStrings(source, comments)
-    source = ExtractComments(source, comments)
+    source = ExtractStrings(source, masked)
+    source = ExtractComments(source, masked)
     source, interfaces = ParseAttributes(source)
     source = ParseInterfaces(source)
     source = ParseSafeArray(source)
-    source = ReplaceComments(source, comments)
+    source = ReplaceComments(source, masked)
     source, last_import = ParseImport(source)
     source = ParseCppQuote(source)
         
