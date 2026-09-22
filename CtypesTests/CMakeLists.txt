@@ -17,14 +17,20 @@ target_link_libraries(ExampleLib PRIVATE TestInterfaces)
 # beside the header
 find_package(Python COMPONENTS Interpreter REQUIRED)
 
-set(PY_BINDINGS "${CMAKE_CURRENT_BINARY_DIR}/ExampleBindings.py")
-
-add_custom_command(
-    OUTPUT  ${PY_BINDINGS}
-    COMMAND ${Python_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/idl2py.py" "${CMAKE_BINARY_DIR}/TestInterfaces/Example.json" ${PY_BINDINGS}
-    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/idl2py.py" "${CMAKE_BINARY_DIR}/TestInterfaces/Example.json"
-    COMMENT "Generating Python bindings..."
-)
+# Registry.idl imports Example.idl, so its bindings read Example.json as well,
+# and import the ones for it as ExampleBindings
+set(JSON_FILES "${CMAKE_BINARY_DIR}/TestInterfaces/Example.json" "${CMAKE_BINARY_DIR}/TestInterfaces/Registry.json")
+set(PY_BINDINGS "")
+foreach(NAME Example Registry)
+    set(PY_FILE "${CMAKE_CURRENT_BINARY_DIR}/${NAME}Bindings.py")
+    add_custom_command(
+        OUTPUT  ${PY_FILE}
+        COMMAND ${Python_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/idl2py.py" "${CMAKE_BINARY_DIR}/TestInterfaces/${NAME}.json" ${PY_FILE}
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/idl2py.py" ${JSON_FILES}
+        COMMENT "Generating Python bindings for ${NAME}..."
+    )
+    list(APPEND PY_BINDINGS ${PY_FILE})
+endforeach()
 add_custom_target(ExampleBindings DEPENDS ${PY_BINDINGS})
 add_dependencies(ExampleBindings TestInterfaces) # for Example.json
 add_dependencies(ExampleLib ExampleBindings)

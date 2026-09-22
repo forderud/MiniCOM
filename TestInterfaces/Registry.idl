@@ -1,0 +1,155 @@
+/* Interfaces that build on Example.idl, for the Python binding test. They pass
+   what Example.idl does not, and a real interface library does: interfaces
+   declared in an imported file, IUnknown, strings, fixed-size arrays and
+   SAFEARRAYs, booleans, enums, structs holding all of those, several [out]
+   arguments and [in,out] ones. ISource derives from an interface in the
+   imported file. A "void *" stands for a type the bindings cannot pass. */
+import "Example.idl";
+
+
+typedef [v1_enum] enum Shape {
+    SHAPE_NONE = 0,
+    SHAPE_LINE = 1 << 0,
+    SHAPE_BOX  = SHAPE_LINE << 1, // refers to an earlier value
+} Shape;
+
+typedef struct Span {
+    float low;
+    float high;
+} Span;
+
+typedef [helpstring("Every kind of field that a struct passed through the bindings can have.")]
+struct Record {
+    BSTR              name;
+    Shape             shape;
+    Span              span;
+    float             weights[3];
+    SAFEARRAY(double) samples;
+    VARIANT_BOOL      valid;
+    BOOL              flag;  // "long" in NonWindows.hpp, so 64bit on 64bit Linux and macOS
+    long              big;
+    double            after; // read from the wrong place if a field before it is sized wrong
+} Record;
+
+
+[object,
+  oleautomation,
+  uuid(E4D4FB65-2C4A-452A-916D-8AFBC3EB175F),
+  helpstring("Something a registry can describe. A callback that it also sends messages to.")]
+interface ISource : ICalcCb {
+    [helpstring("Takes a type the bindings cannot pass.")]
+    HRESULT Opaque ([in] void * data);
+
+    [helpstring("Name of the source.")]
+    HRESULT Name ([out,retval] BSTR * name);
+
+    [helpstring("Calculator that the source uses.")]
+    HRESULT Calculator ([out,retval] ICalc2 ** calc);
+
+    [helpstring("Span of the source.")]
+    HRESULT GetSpan ([out,retval] Span * span);
+
+    [helpstring("Whether the source accepts a calculator.")]
+    HRESULT Accept ([in] ICalc2 * calc, [out,retval] VARIANT_BOOL * accepted);
+
+    [helpstring("Range of values the source produces.")]
+    HRESULT Range ([out] int * low, [out,retval] int * high);
+
+    [helpstring("Adjust a value in place.")]
+    HRESULT Adjust ([in,out] double * value);
+
+    [helpstring("Scale three values to sum to one.")]
+    HRESULT Normalize ([in] const float values[3], [out] float result[3]);
+
+    [helpstring("Samples the source produces.")]
+    HRESULT Samples ([out,retval] SAFEARRAY(float) * samples);
+
+    [helpstring("A record describing some words.")]
+    HRESULT Label ([in] SAFEARRAY(BSTR) words, [out,retval] Record * record);
+};
+
+[object,
+  oleautomation,
+  uuid(759B840B-FDBB-49EB-9EC6-456801356642),
+  helpstring("Keeps an object for a client to fetch again.")]
+interface IRegistry : IUnknown {
+    [helpstring("Create a calculator.")]
+    HRESULT NewCalculator ([out,retval] ICalcExt ** calc);
+
+    [helpstring("Keep an object, releasing the one kept before.")]
+    HRESULT Store ([in] IUnknown * obj);
+
+    [helpstring("Get the kept object back.")]
+    HRESULT Fetch ([out,retval] IUnknown ** obj);
+
+    [helpstring("Describe a source, from everything it reports.")]
+    HRESULT Describe ([in] ISource * source, [out,retval] BSTR * text);
+
+    [helpstring("A record with every field filled in.")]
+    HRESULT MakeRecord ([in] BSTR name, [out,retval] Record * record);
+
+    [helpstring("Every field of a record, as text.")]
+    HRESULT CheckRecord ([in] Record * record, [out,retval] BSTR * summary);
+
+    [helpstring("Bytes in reverse order.")]
+    HRESULT Reverse ([in] SAFEARRAY(BYTE) data, [out,retval] SAFEARRAY(BYTE) * reversed);
+
+    [helpstring("Words in upper case.")]
+    HRESULT Upper ([in] SAFEARRAY(BSTR) words, [out,retval] SAFEARRAY(BSTR) * upper);
+
+    [helpstring("The kept object, and a new calculator.")]
+    HRESULT Objects ([out,retval] SAFEARRAY(IUnknown*) * objects);
+};
+
+[object,
+  oleautomation,
+  uuid(F4487724-568A-4366-8B7B-B8015E38186A),
+  helpstring("Arrays, booleans, enums, structs, and several or [in,out] out arguments.")]
+interface IStats : IUnknown {
+    [helpstring("Takes a type the bindings cannot pass.")]
+    HRESULT Opaque ([in] void * data);
+
+    [helpstring("Span of three values.")]
+    HRESULT GetSpan ([in] const float values[3], [out,retval] Span * span);
+
+    [helpstring("Sum of three values.")]
+    HRESULT Sum ([in] const float values[3], [out,retval] double * sum);
+
+    [helpstring("Number of Store calls so far.")]
+    HRESULT StoreCount ([out,retval] unsigned int * count);
+
+    [helpstring("Smallest and largest of three values.")]
+    HRESULT MinMax ([in] const float values[3], [out] float * min, [out,retval] float * max);
+
+    [helpstring("Bytes of a value, least significant first.")]
+    HRESULT Bytes ([in] unsigned int value, [out] unsigned char bytes[4]);
+
+    [helpstring("Double a value in place, and negate it if asked to.")]
+    HRESULT Scale ([in,out] double * value, [in] VARIANT_BOOL negate);
+
+    [helpstring("Whether a value is positive.")]
+    HRESULT Positive ([in] double value, [out,retval] VARIANT_BOOL * positive);
+
+    [helpstring("A span widened on both sides.")]
+    HRESULT Widen ([in] Span span, [in] float by, [out,retval] Span * wider);
+
+    [helpstring("The shape after this one.")]
+    HRESULT Next ([in] Shape shape, [out,retval] Shape * next);
+};
+
+
+[uuid(D863B90D-FDFD-4E25-B142-E44448070EA5),
+version(1.0),
+helpstring("Registry type library.")]
+library RegistryLib {
+    interface ISource;
+    interface IRegistry;
+    interface IStats;
+
+    [ uuid(C6A635E5-E528-43E6-8669-EA6038607C23),
+      helpstring("Registry class.")]
+    coclass Registry {
+        [default] interface IRegistry;
+        interface IStats;
+    };
+};
