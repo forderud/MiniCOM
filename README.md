@@ -2,7 +2,7 @@ Partial cross-platform implementation of the [Component Object Model (COM)](http
 
 Designed as a **compatibility library to enable usage of existing COM/ATL classes also on non-Windows platforms**.
 
-Developed due to lack of knowledge of any better alternatives. Please contact the author if you're aware of any better alternative, and he'll be happy to scrap this project. I'm hoping that Microsoft [xlang](https://github.com/microsoft/xlang) or a similar project will eventually replace this project, but cross-platform support have so far been postponed.
+Developed due to lack of knowledge of any better alternatives. Please contact the author if you're aware of any better alternative, and he'll be happy to scrap this project. I'm hoping that Microsoft [xlang](https://github.com/microsoft/xlang) or a similar project will eventually replace this project. However, cross-platform support have so far been postponed in xlang.
 
 ### Design goals
 * Support most automation-compatible COM IDL types. These are the types that can be directly accessed from C# and Python (using [comtypes](https://pythonhosted.org/comtypes/)) on Windows without any language wrappers.
