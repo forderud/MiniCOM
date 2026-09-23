@@ -247,6 +247,68 @@ def ParseImport (source):
     return source, last_import
 
 
+def SplitParameters (arglist):
+    '''Split a parameter or attribute list on its top level commas'''
+    params = []
+    depth = 0
+    current = ''
+    for ch in arglist:
+        if ch in '([<':
+            depth += 1
+        elif ch in ')]>':
+            depth -= 1
+        if ch == ',' and depth == 0:
+            params.append(current)
+            current = ''
+        else:
+            current += ch
+    params.append(current)
+
+    result = []
+    for param in params:
+        if param.strip():
+            result.append(param.strip())
+    return result
+
+
+def CollectInterfaces (source):
+    '''Return the interfaces an IDL source defines, in declaration order, as
+       [(name, base, uuid, [(method, [(attributes, declaration), ...]), ...]), ...]
+
+       'attributes' are those of a parameter, such as ['in'] or ['out', 'retval'],
+       and 'declaration' is the rest of it, such as "SAFEARRAY(BYTE) * data".
+       Expects strings and comments to have been replaced with placeholders.
+       Leaves the source unchanged, so that the header does not depend on it.'''
+    interfaces = []
+
+    # pattern to match '[...] interface ABC : IUnknown {...}'
+    pattern = re.compile('(\\[[^\\]]*\\])?\\s*interface\\s+([a-zA-Z0-9_]+)\\s*:\\s*([a-zA-Z0-9_]+)\\s*{(.*?)}', re.DOTALL)
+    # pattern to match 'HRESULT Fun (....);' method signatures
+    method_pattern = re.compile('HRESULT\\s+([a-zA-Z0-9_]+)\\s*\\((.*?)\\)\\s*;', re.DOTALL)
+
+    for match in pattern.finditer(source):
+        uuid = ''
+        if match.group(1) and 'uuid(' in match.group(1):
+            uuid = FindUuidString(match.group(1))
+
+        methods = []
+        for method in method_pattern.finditer(match.group(4)):
+            params = []
+            for param in SplitParameters(method.group(2)):
+                attributes = []
+                attribute = re.match('\\[(.*?)\\]', param)
+                if attribute:
+                    attributes = SplitParameters(attribute.group(1))
+                    param = param[attribute.end():]
+                # drop comments, and the line breaks of a multi-line declaration
+                declaration = ' '.join(MASK_PATTERN.sub(' ', param).split())
+                params.append((attributes, declaration))
+            methods.append((method.group(1), params))
+
+        interfaces.append((match.group(2), match.group(3), uuid, methods))
+    return interfaces
+
+
 def ParseIdlFile (idl_file, h_file, c_file):
     with open(idl_file, 'r') as f:
         source = f.read()
