@@ -6,7 +6,7 @@ Developed due to lack of knowledge of any better alternatives. Please contact th
 
 ### Design goals
 * Support most COM classes implemented in ATL.
-* Support most automation-compatible types, so that the same COM classes can be directly accessed from C# and Python (using [comtypes](https://pythonhosted.org/comtypes/)) on Windows without any language wrappers or proxy/stub DLLs for marshaling.
+* Support most automation-compatible IDL types. These are the types that can be directly accessed from C# and Python (using [comtypes](https://pythonhosted.org/comtypes/)) on Windows without any language wrappers.
 
 ### Platform support
 The following operating systems are currently supported:
