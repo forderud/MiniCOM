@@ -16,7 +16,7 @@ if(NOT WIN32)
         add_custom_command(
             OUTPUT  ${OUTPUTS_FILES}
             COMMAND ${Python_EXECUTABLE} "${CURRENT_DIR}/IdlParse.py" ${INPUT_FILES}
-            DEPENDS ${INPUT_FILES}
+            DEPENDS ${INPUT_FILES} "${CURRENT_DIR}/IdlParse.py"
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
             COMMENT "Processing IDL files..."
         )
