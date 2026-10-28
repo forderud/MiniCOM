@@ -15,9 +15,10 @@ if(WIN32)
 
     target_include_directories(TestInterfaces PUBLIC ${CMAKE_CURRENT_BINARY_DIR}) # folder with generated headers
 
-    # the interfaces as a .winmd file, the metadata format of win32metadata.
-    # Generating it takes MIDL and the .NET SDK, so it is committed, the way
-    # Example.tlh is, for other platforms to read.
+    # the interfaces as a .winmd file, which the non-Windows builds generate
+    # their Python bindings from. Generating it takes MIDL and the .NET SDK, so
+    # it is committed, the way Example.tlh is, along with the hashes of the IDL
+    # files it describes.
     find_program(DOTNET_EXECUTABLE dotnet)
     if(DOTNET_EXECUTABLE)
         # the generator runs on .NET 10, which an older SDK cannot build for
@@ -31,16 +32,18 @@ if(WIN32)
     elseif(NO_DNFILE)
         message(STATUS "No dnfile for py, so TestInterfaces.winmd is not regenerated: py -m pip install dnfile")
     else()
+        set(WINMD_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/Example.idl" "${CMAKE_CURRENT_SOURCE_DIR}/Registry.idl")
         file(GLOB WINMD_PROJECT LIST_DIRECTORIES false "${CMAKE_SOURCE_DIR}/Winmd/*")
         # regenerated only when the IDL or the project changes, and from a
         # clean obj folder, since the generator's own incremental build does
         # not notice every change to the project
         add_custom_command(
-            OUTPUT  "${CMAKE_CURRENT_SOURCE_DIR}/TestInterfaces.winmd"
+            OUTPUT  "${CMAKE_CURRENT_SOURCE_DIR}/TestInterfaces.winmd" "${CMAKE_CURRENT_SOURCE_DIR}/TestInterfaces.winmd.sha256"
             COMMAND ${CMAKE_COMMAND} -E rm -rf obj bin
             COMMAND ${DOTNET_EXECUTABLE} build TestInterfaces.proj -nologo -v:minimal
             COMMAND py WinmdRemoveTimeStamps.py "${CMAKE_CURRENT_SOURCE_DIR}/TestInterfaces.winmd"
-            DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/Example.idl" "${CMAKE_CURRENT_SOURCE_DIR}/Registry.idl" ${WINMD_PROJECT}
+            COMMAND py WinmdRecordSources.py "${CMAKE_CURRENT_SOURCE_DIR}/TestInterfaces.winmd" ${WINMD_SOURCES}
+            DEPENDS ${WINMD_SOURCES} ${WINMD_PROJECT}
             WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/Winmd"
             COMMENT "Describing the interfaces in TestInterfaces.winmd")
         add_custom_target(TestInterfacesWinmd ALL DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/TestInterfaces.winmd")

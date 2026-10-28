@@ -1,3 +1,4 @@
 /build
 /Winmd/obj
 /Winmd/bin
+__pycache__
