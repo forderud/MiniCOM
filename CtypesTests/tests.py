@@ -126,7 +126,7 @@ try:
     stats.Opaque(None)
     assert False, "Opaque should not be callable"
 except NotImplementedError as error:
-    assert "unsupported type" in str(error), str(error)
+    assert "int **" in str(error), str(error)
 
 # a Python object kept by C++ as IUnknown: the registry holds a reference while
 # it keeps it, and fetching it back hands out the same object

@@ -106,7 +106,7 @@ class Bindings:
             if type['Shape']:
                 size = str(type['Shape']['Size'])
             return 'comruntime.FixedArray('+self.Type(type['Child'])+', '+size+')'
-        raise Unsupported('unsupported type "'+type.get('Name', type['Kind'])+'"')
+        raise Unsupported('unsupported type "'+Describe(type)+'"')
 
     def Param (self, param):
         '''How a method argument is passed, as a comruntime parameter.'''
@@ -118,6 +118,9 @@ class Bindings:
                 direction = 'InOut'
 
         type = param['Type']
+        if type['Kind'] == 'PointerTo' and type['Child']['Kind'] == 'PointerTo' and type['Child']['Child']['Kind'] == 'Native':
+            raise Unsupported('unsupported type "'+Describe(type)+'"') # such as int **
+
         if type['Kind'] == 'Array':
             # passed as a pointer to its first element, as in C
             if direction == 'Out' and not type['Shape']:
@@ -204,6 +207,17 @@ class Bindings:
         for api in self.imports:
             out += 'import '+api+'Bindings\n'
         return out+declared+'\n\n# signatures, which can refer to any class above\n'+signatures
+
+
+def Describe (type):
+    '''A described type as C-like text, for messages.'''
+    if type['Kind'] == 'PointerTo':
+        if type['Child']['Kind'] == 'PointerTo':
+            return Describe(type['Child'])+'*'
+        return Describe(type['Child'])+' *'
+    if type['Kind'] == 'Array':
+        return Describe(type['Child'])+'[]'
+    return type.get('Name', type['Kind'])
 
 
 if __name__ == '__main__':
