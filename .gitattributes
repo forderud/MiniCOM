@@ -1,3 +1,6 @@
 # Shell scripts require LF
 *.sh    text eol=lf
 *.py    text eol=lf
+
+# Generated binary, committed
+*.winmd  binary
