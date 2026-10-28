@@ -3,7 +3,7 @@
    declared in an imported file, IUnknown, strings, fixed-size arrays and
    SAFEARRAYs, booleans, enums, structs holding all of those, several [out]
    arguments and [in,out] ones. ISource derives from an interface in the
-   imported file. A "void *" stands for a type the bindings cannot pass. */
+   imported file. An "int **" stands for a type the bindings cannot pass. */
 import "Example.idl";
 
 
@@ -38,7 +38,7 @@ struct Record {
   helpstring("Something a registry can describe. A callback that it also sends messages to.")]
 interface ISource : ICalcCb {
     [helpstring("Takes a type the bindings cannot pass.")]
-    HRESULT Opaque ([in] void * data);
+    HRESULT Opaque ([in] int ** data);
 
     [helpstring("Name of the source.")]
     HRESULT Name ([out,retval] BSTR * name);
@@ -107,7 +107,7 @@ interface IRegistry : IUnknown {
   helpstring("Arrays, booleans, enums, structs, and several or [in,out] out arguments.")]
 interface IStats : IUnknown {
     [helpstring("Takes a type the bindings cannot pass.")]
-    HRESULT Opaque ([in] void * data);
+    HRESULT Opaque ([in] int ** data);
 
     [helpstring("Span of three values.")]
     HRESULT GetSpan ([in] const float values[3], [out,retval] Span * span);

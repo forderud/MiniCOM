@@ -277,7 +277,7 @@ public:
         return S_OK;
     }
 
-    HRESULT Opaque (void * /*data*/) override {
+    HRESULT Opaque (int ** /*data*/) override {
         return S_OK;
     }
 
