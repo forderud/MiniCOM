@@ -40,14 +40,18 @@ if(WIN32)
             COMMAND ${CMAKE_COMMAND} -E rm -rf obj bin
             COMMAND ${DOTNET_EXECUTABLE} build TestInterfaces.proj -nologo -v:minimal
             COMMAND py WinmdRemoveTimeStamps.py "${CMAKE_CURRENT_SOURCE_DIR}/TestInterfaces.winmd"
-            DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/Example.idl" ${WINMD_PROJECT}
+            DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/Example.idl" "${CMAKE_CURRENT_SOURCE_DIR}/Registry.idl" ${WINMD_PROJECT}
             WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/Winmd"
             COMMENT "Describing the interfaces in TestInterfaces.winmd")
         add_custom_target(TestInterfacesWinmd ALL DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/TestInterfaces.winmd")
     endif()
 else()
+    # interfaces for the Python binding test, which is non-Windows only
+    list(APPEND IDL_INPUTS  "${CMAKE_CURRENT_SOURCE_DIR}/Registry.idl")
+    list(APPEND IDL_OUTPUTS "${CMAKE_CURRENT_BINARY_DIR}/Registry.h")
+
     process_idl_files("${IDL_INPUTS}" "${IDL_OUTPUTS}")
-    target_sources(TestInterfaces PRIVATE "${IDL_OUTPUTS}")
+    target_sources(TestInterfaces PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/Example.h")
     target_include_directories(TestInterfaces PUBLIC "${CMAKE_CURRENT_BINARY_DIR}") # folder with generated headers
 endif()
 

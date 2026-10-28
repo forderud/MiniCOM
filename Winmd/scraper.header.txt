@@ -1,0 +1,3 @@
+// Added to the C# that the generator makes of each header, so that
+// Registry.h can refer to the interfaces from the imported Example.idl.
+using Example;

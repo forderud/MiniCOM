@@ -20,15 +20,26 @@
     <OutputWinmd>$(IdlDir)\TestInterfaces.winmd</OutputWinmd>
     <WinmdVersion>1.0.0.0</WinmdVersion>
     <GenerateAssemblyVersionInfo>false</GenerateAssemblyVersionInfo>
+    <!-- Registry.h includes Example.h, and refers to its interfaces -->
+    <AdditionalIncludes>$(CompiledHeadersDir)</AdditionalIncludes>
+    <ScraperHeader>$(MSBuildProjectDirectory)\scraper.header.txt</ScraperHeader>
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- in import order, since MIDL looks for an imported file beside the
+         importing one, and each is rewritten into $(ObjDir) first -->
     <Idls Include="$(IdlDir)\Example.idl"/>
+    <Idls Include="$(IdlDir)\Registry.idl"/>
 
     <!-- a namespace per IDL file, so that a type keeps the file it came from -->
     <Partition Include="Example.cpp">
       <TraverseFiles>$(CompiledHeadersDir)\Example.h</TraverseFiles>
       <Namespace>Example</Namespace>
+      <ExcludeFromCrossarch>true</ExcludeFromCrossarch>
+    </Partition>
+    <Partition Include="Registry.cpp">
+      <TraverseFiles>$(CompiledHeadersDir)\Registry.h</TraverseFiles>
+      <Namespace>Registry</Namespace>
       <ExcludeFromCrossarch>true</ExcludeFromCrossarch>
     </Partition>
   </ItemGroup>

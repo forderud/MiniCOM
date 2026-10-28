@@ -37,6 +37,7 @@ struct
 __declspec(uuid("d8ac9315-ce17-4268-911f-18f5f2135b7f"))
 #endif
 /* interface */ ICalc2;
+struct /* coclass */ Calculator;
 
 //
 // Smart pointer typedef declarations
@@ -139,6 +140,14 @@ ICalc2 : IUnknown
       virtual HRESULT  raw_GetValue2 (
         /*[out,retval]*/ int * value ) = 0;
 };
+
+struct 
+#ifdef _WIN32
+__declspec(uuid("7f5e4d3c-2b1a-4098-8776-655443322110"))
+#endif
+Calculator;
+    // [ default ] interface ICalcExt
+    // interface ICalc2
 
 #ifndef _WIN32
 static constexpr GUID IID_ICalc = {0x9e91b361,0x831f,0x4857,{0x82,0xf7,0x34,0x7a,0x85,0x92,0xc7,0x0b}};
