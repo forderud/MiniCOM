@@ -840,7 +840,7 @@ public:
     }
 
     template<typename U, ::std::enable_if_t<!::std::is_same<U, T>::value, int> = 0>
-    bool operator==(const _com_ptr_t<U>& other) {
+    bool operator==(const _com_ptr_t<U>& other) const {
         U* other_ptr = other; // cannot access other.m_ptr member directly, since it's private
         return CompareUnknown(other_ptr) == 0;
     }
