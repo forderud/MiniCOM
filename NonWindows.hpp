@@ -407,6 +407,7 @@ DEFINE_UUIDOF(IUnknown)
 #else // defined(CINTERFACE)
 
 struct IUnknown; // forward declaration
+struct SAFEARRAY; // only passed by pointer in C vtables
 
 typedef struct IUnknownVtbl {
     HRESULT (*QueryInterface)(IUnknown* This, const GUID& iid, void** obj);
