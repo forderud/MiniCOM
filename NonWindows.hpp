@@ -521,7 +521,6 @@ public:
            #pragma GCC diagnostic pop
          #endif
         }
-        
         return ref;
     }
     HRESULT QueryInterface (const GUID & iid, /*out*/void **obj) override {
