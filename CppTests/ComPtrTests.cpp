@@ -34,7 +34,7 @@ _COM_SMARTPTR_TYPEDEF(IMyMessage, __uuidof(IMyMessage));
 _COM_SMARTPTR_TYPEDEF(IUnsupported, __uuidof(IUnsupported));
 
 
-class ComObjMock : public IMyMessage, public IMyLogger {
+class ComObjMock final : public IMyMessage, public IMyLogger {
 public:
     ComObjMock() {
         ++s_obj_count;
@@ -71,15 +71,8 @@ public:
 
     ULONG Release() override {
         ULONG ref = --m_ref;
-        if (!ref) {
-#ifndef _WIN32
-          APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_PUSH
-#endif
+        if (!ref)
             delete this;
-#ifndef _WIN32
-          APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_POP
-#endif
-        }
         return ref;
     }
 

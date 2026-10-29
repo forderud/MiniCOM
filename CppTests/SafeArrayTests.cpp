@@ -220,21 +220,14 @@ TEST(SafeArrayTests, TestEmptySafeArray) {
 }
 
 TEST(CComSafeArrayTest, TestSetAtInDifferentConditions) {
-    struct MockUnknown : public IUnknown {
+    struct MockUnknown final : public IUnknown {
         ULONG AddRef() override {
             return ++ref_count;
         }
-        ULONG Release() override { 
+        ULONG Release() override {
             ULONG result = --ref_count;
-            if (result == 0) {
-#ifndef _WIN32
-              APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_PUSH
-#endif
+            if (result == 0)
                 delete this;
-#ifndef _WIN32
-              APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_POP
-#endif
-            }
             return result;
         }
         HRESULT QueryInterface(const GUID&, void**) override {
