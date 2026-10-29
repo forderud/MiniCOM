@@ -454,7 +454,16 @@ public:
         auto* ptr = new CComObject<BASE>();
         HRESULT hr = ptr->FinalConstruct();
         if (FAILED(hr)) {
+         #ifdef __clang__
+         #else
+           #pragma GCC diagnostic push
+           #pragma GCC diagnostic ignored "-Wdelete-non-virtual-dtor"
+         #endif
             delete ptr;
+         #ifdef __clang__
+         #else
+           #pragma GCC diagnostic pop
+         #endif
             ptr = nullptr;
         }
 
