@@ -1301,6 +1301,17 @@ template <> unsigned int CComSafeArray<IUnknown*>::GetCount () const;
 
 #define ATL_NO_VTABLE 
 
+#ifdef __clang__
+  #define APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_PUSH
+  #define APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_POP
+#else
+  #define APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_PUSH \
+    _Pragma("GCC diagnostic push") \
+    _Pragma("GCC diagnostic ignored \"-Wdelete-non-virtual-dtor\"")
+  #define APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_POP \
+    _Pragma("GCC diagnostic pop")
+#endif
+
 // QueryInterface support macros
 #define BEGIN_COM_MAP(CLASS)         HRESULT QueryInterface (const GUID & iid, /*out*/void **obj) override { \
                                            static_assert(std::is_same_v<CLASS, std::remove_pointer_t<decltype(this)>>, \
@@ -1337,8 +1348,11 @@ template <> unsigned int CComSafeArray<IUnknown*>::GetCount () const;
                                      ULONG Release () override { \
                                          ULONG ref = --m_ref; \
                                          assert((m_ref < 0xFFFF) && "IUnknown::Release negative ref count."); \
-                                         if (!ref) \
+                                         if (!ref) { \
+                                            APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_PUSH \
                                              delete this; \
+                                            APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_POP \
+                                         } \
                                          return ref; \
                                      } \
                                      std::atomic<ULONG> m_ref {0};
