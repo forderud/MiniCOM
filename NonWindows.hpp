@@ -500,8 +500,18 @@ public:
     }
     ULONG Release () override {
         ULONG ref = --m_ref;
-        if (!ref)
+        if (!ref) {
+         #ifdef __clang__
+         #else
+           #pragma GCC diagnostic push
+           #pragma GCC diagnostic ignored "-Wdelete-non-virtual-dtor"
+         #endif
             delete this;
+         #ifdef __clang__
+         #else
+           #pragma GCC diagnostic pop
+         #endif
+        }
         
         return ref;
     }
