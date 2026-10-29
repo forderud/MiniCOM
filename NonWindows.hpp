@@ -455,12 +455,15 @@ public:
         HRESULT hr = ptr->FinalConstruct();
         if (FAILED(hr)) {
          #ifdef __clang__
+           #pragma clang diagnostic push
+           #pragma clang diagnostic ignored "-Wdelete-non-abstract-non-virtual-dtor"
          #else
            #pragma GCC diagnostic push
            #pragma GCC diagnostic ignored "-Wdelete-non-virtual-dtor"
          #endif
             delete ptr;
          #ifdef __clang__
+           #pragma clang diagnostic pop
          #else
            #pragma GCC diagnostic pop
          #endif
