@@ -526,7 +526,16 @@ public:
         auto* ptr = new CComAggObject<BASE>(unkOuter);
         HRESULT hr = ptr->m_contained.FinalConstruct();
         if (FAILED(hr)) {
+         #ifdef __clang__
+         #else
+           #pragma GCC diagnostic push
+           #pragma GCC diagnostic ignored "-Wdelete-non-virtual-dtor"
+         #endif
             delete ptr;
+         #ifdef __clang__
+         #else
+           #pragma GCC diagnostic pop
+         #endif
             ptr = nullptr;
         }
 
