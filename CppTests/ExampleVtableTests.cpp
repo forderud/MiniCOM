@@ -42,6 +42,8 @@ void TestICalcVtable(ICalc* ptr) {
     HRESULT hr = ptr->lpVtbl->GetValue(ptr, &val);
     EXPECT_EQ(hr, S_OK);
     EXPECT_EQ(val, 42);
+#else
+    (void)ptr; // mute unused parameter warning
 #endif
 }
 
@@ -58,6 +60,8 @@ void TestICalcExtVtable(ICalcExt* ptr) {
     hr = ptr->lpVtbl->Add(ptr, 1, 2, &val);
     EXPECT_EQ(hr, S_OK);
     EXPECT_EQ(val, 3);
+#else
+    (void)ptr; // mute unused parameter warning
 #endif
 }
 
