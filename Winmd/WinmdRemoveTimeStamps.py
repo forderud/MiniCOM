@@ -5,6 +5,10 @@
 # header, and with a random module version id (MVID). The time is zeroed, and
 # the MVID is made from a hash of the rest of the file instead, so that it
 # still changes when the interfaces do, which is what it is for.
+#
+# This script can be removed once https://github.com/microsoft/win32metadata/pull/2396
+# is merged into win32metadata and released in Microsoft.Windows.WinmdGenerator,
+# since that PR makes the generator write the file deterministically itself.
 
 import hashlib
 import struct
@@ -37,5 +41,5 @@ def Normalize (path):
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
-        raise Exception('usage: WinmdStamps.py <file.winmd>')
+        raise Exception('usage: WinmdRemoveTimeStamps.py <file.winmd>')
     Normalize(sys.argv[1])

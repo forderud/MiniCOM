@@ -33,7 +33,7 @@ if(WIN32)
             OUTPUT  "${CMAKE_CURRENT_SOURCE_DIR}/TestInterfaces.winmd"
             COMMAND ${CMAKE_COMMAND} -E rm -rf obj bin
             COMMAND ${DOTNET_EXECUTABLE} build TestInterfaces.proj -nologo -v:minimal
-            COMMAND py WinmdStamps.py "${CMAKE_CURRENT_SOURCE_DIR}/TestInterfaces.winmd"
+            COMMAND py WinmdRemoveTimeStamps.py "${CMAKE_CURRENT_SOURCE_DIR}/TestInterfaces.winmd"
             DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/Example.idl" ${WINMD_PROJECT}
             WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/Winmd"
             COMMENT "Describing the interfaces in TestInterfaces.winmd")
