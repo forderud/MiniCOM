@@ -70,5 +70,7 @@ void TestICalc2Vtable(ICalc2* ptr) {
     HRESULT hr = ptr->lpVtbl->GetValue2(ptr, &val);
     EXPECT_EQ(hr, S_OK);
     EXPECT_EQ(val, 43);
+#else
+    (void)ptr; // mute unused parameter warning
 #endif
 }
