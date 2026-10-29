@@ -1302,8 +1302,11 @@ template <> unsigned int CComSafeArray<IUnknown*>::GetCount () const;
 #define ATL_NO_VTABLE 
 
 #ifdef __clang__
-  #define APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_PUSH
-  #define APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_POP
+  #define APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_PUSH \
+    _Pragma("clang diagnostic push") \
+    _Pragma("clang diagnostic ignored \"-Wdelete-non-abstract-non-virtual-dtor\"")
+  #define APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_POP \
+    _Pragma("clang diagnostic pop")
 #else
   #define APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_PUSH \
     _Pragma("GCC diagnostic push") \
