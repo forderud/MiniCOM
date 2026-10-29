@@ -71,8 +71,15 @@ public:
 
     ULONG Release() override {
         ULONG ref = --m_ref;
-        if (!ref)
+        if (!ref) {
+#ifndef _WIN32
+          APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_PUSH
+#endif
             delete this;
+#ifndef _WIN32
+          APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_POP
+#endif
+        }
         return ref;
     }
 
