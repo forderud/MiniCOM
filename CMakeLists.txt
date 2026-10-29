@@ -3,6 +3,16 @@ project(MiniCOM LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 
+if(MSVC)
+    # warning level 4
+    add_compile_options(/W4)
+else()
+    # -Wall and -Wextra corresponds roughly to /W4 used for MSVC,
+    # see https://clang.llvm.org/docs/UsersManual.html#id9
+    add_compile_options(-Wall)
+    add_compile_options(-Wextra)
+endif()
+
 add_definitions(-DUNICODE -D_UNICODE)
 
 if(NOT WIN32)
