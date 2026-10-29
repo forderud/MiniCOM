@@ -33,7 +33,7 @@ static void TestQueryInterface(INTERFACE* ptr) {
 }
 
 
-void TestICalcVtable(ICalc* ptr) {
+void TestICalcVtable([[maybe_unused]] ICalc* ptr) {
 #ifdef _WIN32
     TestAddRefRelease(ptr);
     TestQueryInterface(ptr);
@@ -42,12 +42,10 @@ void TestICalcVtable(ICalc* ptr) {
     HRESULT hr = ptr->lpVtbl->GetValue(ptr, &val);
     EXPECT_EQ(hr, S_OK);
     EXPECT_EQ(val, 42);
-#else
-    (void)ptr; // mute unused parameter warning
 #endif
 }
 
-void TestICalcExtVtable(ICalcExt* ptr) {
+void TestICalcExtVtable([[maybe_unused]] ICalcExt* ptr) {
 #ifdef _WIN32
     TestAddRefRelease(ptr);
     TestQueryInterface(ptr);
@@ -60,12 +58,10 @@ void TestICalcExtVtable(ICalcExt* ptr) {
     hr = ptr->lpVtbl->Add(ptr, 1, 2, &val);
     EXPECT_EQ(hr, S_OK);
     EXPECT_EQ(val, 3);
-#else
-    (void)ptr; // mute unused parameter warning
 #endif
 }
 
-void TestICalc2Vtable(ICalc2* ptr) {
+void TestICalc2Vtable([[maybe_unused]] ICalc2* ptr) {
 #ifdef _WIN32
     TestAddRefRelease(ptr);
     TestQueryInterface(ptr);
@@ -74,7 +70,5 @@ void TestICalc2Vtable(ICalc2* ptr) {
     HRESULT hr = ptr->lpVtbl->GetValue2(ptr, &val);
     EXPECT_EQ(hr, S_OK);
     EXPECT_EQ(val, 43);
-#else
-    (void)ptr; // mute unused parameter warning
 #endif
 }

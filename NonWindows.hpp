@@ -438,6 +438,10 @@ inline void _com_issue_errorex(HRESULT hr, IUnknown*, const IID &) {
 
 #if !defined(CINTERFACE)
 
+// Mute warning for "delete this" in END_COM_MAP() Release(). The warning is formally correct,
+// since a CComObject<CLASS> is deleted through a CLASS pointer without a virtual destructor.
+// It's nevertheless safe in practice, since CComObject is final, adds no data members
+// (enforced by static_assert) and has no destructor.
 #ifdef __clang__
   #define APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_PUSH \
     _Pragma("clang diagnostic push") \
@@ -454,7 +458,7 @@ inline void _com_issue_errorex(HRESULT hr, IUnknown*, const IID &) {
 
 
 template <class BASE>
-class CComObject : public BASE {
+class CComObject final : public BASE { // final to make "delete ptr" safe without a virtual destructor
 public:
     CComObject() {
         static_assert(sizeof(*this) == sizeof(BASE)); // ensure it's safe to delete a BASE pointer without leaking memory
@@ -469,9 +473,7 @@ public:
         auto* ptr = new CComObject<BASE>();
         HRESULT hr = ptr->FinalConstruct();
         if (FAILED(hr)) {
-          APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_PUSH
             delete ptr;
-          APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_POP
             ptr = nullptr;
         }
 
@@ -505,7 +507,7 @@ private:
 };
 
 template <class BASE>
-class CComAggObject : public IUnknown {
+class CComAggObject final : public IUnknown { // final to make "delete this" safe without a virtual destructor
 public:
     CComAggObject (IUnknown* pOuterUnknown) : m_contained(pOuterUnknown) {
     }
@@ -517,11 +519,9 @@ public:
     }
     ULONG Release () override {
         ULONG ref = --m_ref;
-        if (!ref) {
-          APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_PUSH
+        if (!ref)
             delete this;
-          APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_POP
-        }
+
         return ref;
     }
     HRESULT QueryInterface (const GUID & iid, /*out*/void **obj) override {
@@ -545,9 +545,7 @@ public:
         auto* ptr = new CComAggObject<BASE>(unkOuter);
         HRESULT hr = ptr->m_contained.FinalConstruct();
         if (FAILED(hr)) {
-          APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_PUSH
             delete ptr;
-          APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_POP
             ptr = nullptr;
         }
 
@@ -1293,7 +1291,7 @@ template <> unsigned int CComSafeArray<IUnknown*>::GetCount () const;
 // COM calling convention (use default on non-Windows)
 #define STDMETHODCALLTYPE
 
-#define ATL_NO_VTABLE 
+#define ATL_NO_VTABLE
 
 // QueryInterface support macros
 #define BEGIN_COM_MAP(CLASS)         HRESULT QueryInterface (const GUID & iid, /*out*/void **obj) override { \
