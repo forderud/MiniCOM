@@ -438,6 +438,21 @@ inline void _com_issue_errorex(HRESULT hr, IUnknown*, const IID &) {
 
 #if !defined(CINTERFACE)
 
+#ifdef __clang__
+  #define APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_PUSH \
+    _Pragma("clang diagnostic push") \
+    _Pragma("clang diagnostic ignored \"-Wdelete-non-abstract-non-virtual-dtor\"")
+  #define APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_POP \
+    _Pragma("clang diagnostic pop")
+#else
+  #define APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_PUSH \
+    _Pragma("GCC diagnostic push") \
+    _Pragma("GCC diagnostic ignored \"-Wdelete-non-virtual-dtor\"")
+  #define APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_POP \
+    _Pragma("GCC diagnostic pop")
+#endif
+
+
 template <class BASE>
 class CComObject : public BASE {
 public:
@@ -454,19 +469,9 @@ public:
         auto* ptr = new CComObject<BASE>();
         HRESULT hr = ptr->FinalConstruct();
         if (FAILED(hr)) {
-         #ifdef __clang__
-           #pragma clang diagnostic push
-           #pragma clang diagnostic ignored "-Wdelete-non-abstract-non-virtual-dtor"
-         #else
-           #pragma GCC diagnostic push
-           #pragma GCC diagnostic ignored "-Wdelete-non-virtual-dtor"
-         #endif
+          APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_PUSH
             delete ptr;
-         #ifdef __clang__
-           #pragma clang diagnostic pop
-         #else
-           #pragma GCC diagnostic pop
-         #endif
+          APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_POP
             ptr = nullptr;
         }
 
@@ -513,19 +518,9 @@ public:
     ULONG Release () override {
         ULONG ref = --m_ref;
         if (!ref) {
-         #ifdef __clang__
-           #pragma clang diagnostic push
-           #pragma clang diagnostic ignored "-Wdelete-non-abstract-non-virtual-dtor"
-         #else
-           #pragma GCC diagnostic push
-           #pragma GCC diagnostic ignored "-Wdelete-non-virtual-dtor"
-         #endif
+          APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_PUSH
             delete this;
-         #ifdef __clang__
-           #pragma clang diagnostic pop
-         #else
-           #pragma GCC diagnostic pop
-         #endif
+          APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_POP
         }
         return ref;
     }
@@ -550,19 +545,9 @@ public:
         auto* ptr = new CComAggObject<BASE>(unkOuter);
         HRESULT hr = ptr->m_contained.FinalConstruct();
         if (FAILED(hr)) {
-         #ifdef __clang__
-           #pragma clang diagnostic push
-           #pragma clang diagnostic ignored "-Wdelete-non-abstract-non-virtual-dtor"
-         #else
-           #pragma GCC diagnostic push
-           #pragma GCC diagnostic ignored "-Wdelete-non-virtual-dtor"
-         #endif
+          APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_PUSH
             delete ptr;
-         #ifdef __clang__
-           #pragma clang diagnostic pop
-         #else
-           #pragma GCC diagnostic pop
-         #endif
+          APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_POP
             ptr = nullptr;
         }
 
@@ -1309,20 +1294,6 @@ template <> unsigned int CComSafeArray<IUnknown*>::GetCount () const;
 #define STDMETHODCALLTYPE
 
 #define ATL_NO_VTABLE 
-
-#ifdef __clang__
-  #define APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_PUSH \
-    _Pragma("clang diagnostic push") \
-    _Pragma("clang diagnostic ignored \"-Wdelete-non-abstract-non-virtual-dtor\"")
-  #define APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_POP \
-    _Pragma("clang diagnostic pop")
-#else
-  #define APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_PUSH \
-    _Pragma("GCC diagnostic push") \
-    _Pragma("GCC diagnostic ignored \"-Wdelete-non-virtual-dtor\"")
-  #define APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_POP \
-    _Pragma("GCC diagnostic pop")
-#endif
 
 // QueryInterface support macros
 #define BEGIN_COM_MAP(CLASS)         HRESULT QueryInterface (const GUID & iid, /*out*/void **obj) override { \
