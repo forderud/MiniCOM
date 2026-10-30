@@ -442,12 +442,6 @@ inline void _com_issue_errorex(HRESULT hr, IUnknown*, const IID &) {
 template <class BASE>
 class CComObject final : public BASE {
 public:
-    CComObject() {
-        static_assert(sizeof(*this) == sizeof(BASE)); // ensure it's safe to delete a BASE pointer without leaking memory
-    }
-
-    /* NO destructor here, since it's not guaranteed to be called. */
-
     ULONG AddRef () override {
         return BASE::InternalAddRef();
     }
