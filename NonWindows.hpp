@@ -454,7 +454,7 @@ inline void _com_issue_errorex(HRESULT hr, IUnknown*, const IID &) {
 
 
 template <class BASE>
-class CComObject : public BASE {
+class CComObject final : public BASE {
 public:
     CComObject() {
         static_assert(sizeof(*this) == sizeof(BASE)); // ensure it's safe to delete a BASE pointer without leaking memory
@@ -469,9 +469,7 @@ public:
         auto* ptr = new CComObject<BASE>();
         HRESULT hr = ptr->FinalConstruct();
         if (FAILED(hr)) {
-          APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_PUSH
             delete ptr;
-          APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_POP
             ptr = nullptr;
         }
 
@@ -505,7 +503,7 @@ private:
 };
 
 template <class BASE>
-class CComAggObject : public IUnknown {
+class CComAggObject final : public IUnknown {
 public:
     CComAggObject (IUnknown* pOuterUnknown) : m_contained(pOuterUnknown) {
     }
@@ -518,9 +516,7 @@ public:
     ULONG Release () override {
         ULONG ref = --m_ref;
         if (!ref) {
-          APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_PUSH
             delete this;
-          APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_POP
         }
         return ref;
     }
@@ -545,9 +541,7 @@ public:
         auto* ptr = new CComAggObject<BASE>(unkOuter);
         HRESULT hr = ptr->m_contained.FinalConstruct();
         if (FAILED(hr)) {
-          APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_PUSH
             delete ptr;
-          APPAPI_MUTE_DELETE_NON_VIRTUAL_DTOR_WARNING_POP
             ptr = nullptr;
         }
 
