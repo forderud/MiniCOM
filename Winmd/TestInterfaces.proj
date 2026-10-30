@@ -10,7 +10,8 @@
      .winmd is generated there and committed, the way Example.tlh is.
 
      Build with "dotnet build TestInterfaces.proj" from a Visual Studio developer
-     prompt, which has the .NET SDK and finds MIDL. -->
+     prompt, which finds MIDL. The generator runs on .NET 10, so it takes the
+     .NET 10 SDK or later, which Visual Studio 2022 does not install. -->
 <Project>
   <Import Project="Sdk.props" Sdk="Microsoft.Windows.WinmdGenerator" Version="0.71.37-preview"/>
 

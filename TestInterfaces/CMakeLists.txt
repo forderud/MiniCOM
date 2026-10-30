@@ -19,9 +19,15 @@ if(WIN32)
     # Generating it takes MIDL and the .NET SDK, so it is committed, the way
     # Example.tlh is, for other platforms to read.
     find_program(DOTNET_EXECUTABLE dotnet)
+    if(DOTNET_EXECUTABLE)
+        # the generator runs on .NET 10, which an older SDK cannot build for
+        execute_process(COMMAND ${DOTNET_EXECUTABLE} --list-sdks OUTPUT_VARIABLE DOTNET_SDKS ERROR_QUIET)
+    endif()
     execute_process(COMMAND py -c "import dnfile" RESULT_VARIABLE NO_DNFILE OUTPUT_QUIET ERROR_QUIET)
     if(NOT DOTNET_EXECUTABLE)
         message(STATUS "No .NET SDK found, so TestInterfaces.winmd is not regenerated")
+    elseif(NOT DOTNET_SDKS MATCHES "(^|\n)[1-9][0-9]+\\.") # a version of 10 or later
+        message(STATUS "No .NET 10 SDK or later found, so TestInterfaces.winmd is not regenerated")
     elseif(NO_DNFILE)
         message(STATUS "No dnfile for py, so TestInterfaces.winmd is not regenerated: py -m pip install dnfile")
     else()
