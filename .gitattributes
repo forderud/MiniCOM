@@ -1,3 +1,6 @@
 # Shell scripts require LF
 *.sh    text eol=lf
 *.py    text eol=lf
+
+# Written with LF by WinmdRecordSources.py, so that regenerating it does not show as a change
+*.sha256  text eol=lf
