@@ -1293,7 +1293,7 @@ template <> unsigned int CComSafeArray<IUnknown*>::GetCount () const;
 // COM calling convention (use default on non-Windows)
 #define STDMETHODCALLTYPE
 
-#define ATL_NO_VTABLE 
+#define ATL_NO_VTABLE
 
 // QueryInterface support macros
 #define BEGIN_COM_MAP(CLASS)         HRESULT QueryInterface (const GUID & iid, /*out*/void **obj) override { \
