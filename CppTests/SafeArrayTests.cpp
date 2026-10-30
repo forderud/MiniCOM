@@ -224,7 +224,7 @@ TEST(CComSafeArrayTest, TestSetAtInDifferentConditions) {
         ULONG AddRef() override {
             return ++ref_count;
         }
-        ULONG Release() override { 
+        ULONG Release() override {
             ULONG result = --ref_count;
             if (result == 0) {
 #ifndef _WIN32
