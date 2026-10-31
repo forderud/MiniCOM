@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Describes the interfaces in the IDL files below as a .winmd file, the
+     metadata format of https://github.com/microsoft/win32metadata, using its
+     generator.
+
+     The generator does not parse IDL itself. It rewrites the [in], [out] and
+     [retval] attributes into SAL annotations, compiles the IDL with MIDL into a
+     header, reads the header with ClangSharp, and compiles what that finds into
+     the .winmd. MIDL and the ClangSharp it ships only run on Windows, so the
+     .winmd is generated there and committed, the way Example.tlh is.
+
+     Build with "dotnet build TestInterfaces.proj" from a Visual Studio developer
+     prompt, which finds MIDL. The generator runs on .NET 10, so it takes the
+     .NET 10 SDK or later, which Visual Studio 2022 does not install. -->
+<Project>
+  <Import Project="Sdk.props" Sdk="Microsoft.Windows.WinmdGenerator" Version="0.71.37-preview"/>
+
+  <PropertyGroup>
+    <IdlDir>$(MSBuildProjectDirectory)\..\TestInterfaces</IdlDir>
+    <OutputWinmd>$(IdlDir)\TestInterfaces.winmd</OutputWinmd>
+    <WinmdVersion>1.0.0.0</WinmdVersion>
+    <GenerateAssemblyVersionInfo>false</GenerateAssemblyVersionInfo>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Idls Include="$(IdlDir)\Example.idl"/>
+
+    <!-- a namespace per IDL file, so that a type keeps the file it came from -->
+    <Partition Include="Example.cpp">
+      <TraverseFiles>$(CompiledHeadersDir)\Example.h</TraverseFiles>
+      <Namespace>Example</Namespace>
+      <ExcludeFromCrossarch>true</ExcludeFromCrossarch>
+    </Partition>
+  </ItemGroup>
+
+  <!-- netstandard.dll for the generator to compile against, which it otherwise
+       only looks for under C:\Program Files\dotnet\packs. It is passed in a
+       response file, which takes one argument per line, unquoted. -->
+  <ItemGroup>
+    <PackageDownload Include="NETStandard.Library.Ref" Version="[2.1.0]"/>
+    <EmitterRsp Include="$(ObjDir)\netstandard.rsp"/>
+  </ItemGroup>
+
+  <Import Project="Sdk.targets" Sdk="Microsoft.Windows.WinmdGenerator" Version="0.71.37-preview"/>
+
+  <Target Name="NetstandardRsp" BeforeTargets="EmitWinmd">
+    <WriteLinesToFile File="$(ObjDir)\netstandard.rsp" Overwrite="true"
+      Lines="--ref;$(NuGetPackageRoot)netstandard.library.ref\2.1.0\ref\netstandard2.1\netstandard.dll"/>
+  </Target>
+
+  <!-- Replaces the generator's own CompileIdls target, which runs the same two
+       steps but first asks vswhere for a Visual Studio with every workload that
+       win32metadata itself is built with, ARM64 compilers and a .NET 8 runtime
+       included, and fails without them. MIDL needs none of those. The
+       arguments are the ones its CompileIdls task passes, with $(ObjDir) added
+       so that an IDL file that imports another finds the rewritten one. -->
+  <Target Name="CompileIdls" BeforeTargets="Build"
+    Inputs="@(Idls)"
+    Outputs="@(Idls -> '$(CompiledHeadersDir)\%(Filename).h')">
+
+    <PropertyGroup>
+      <MidlArgs>/out "$(ObjDir)" /notlb /no_warn /DUNICODE /D_UNICODE /DWINVER=0x0A00 -D_APISET_MINWIN_VERSION=0x010F /DNTDDI_VERSION=0x0A00000B /DBUILD_UMS_ENABLED=0 /DBUILD_WOW64_ENABLED=0 /DBUILD_ARM64X_ENABLED=0 /DEXECUTABLE_WRITES_SUPPORT=0 -D_USE_DECLSPECS_FOR_SAL=1 -D_CONTROL_FLOW_GUARD_SVCTAB=1 /Di386 /D_X86_ /D_WCHAR_T_DEFINED /no_stamp /nologo /no_settings_comment /lcid 1033 -sal /win32 -target NT100 /Zp8 /I"$(SdkIncRoot)\um" /I"$(SdkIncRoot)\shared" /I"$(SdkIncRoot)\winrt" /I"$(ObjDir)"</MidlArgs>
+    </PropertyGroup>
+
+    <MakeDir Directories="$(ObjDir);$(CompiledHeadersDir)"/>
+    <!-- signed by Microsoft, so it runs under the RemoteSigned and AllSigned policies -->
+    <Exec Command="powershell.exe -NoProfile -NonInteractive -File &quot;$(ScriptsDir)\ConvertMidlAttributesToSalAnnotations.ps1&quot; -inputFileName &quot;%(Idls.FullPath)&quot; -outputFileName &quot;$(ObjDir)\%(Idls.Filename)%(Idls.Extension)&quot;"/>
+    <Exec Command="&quot;$(WindowsSDKVersionedBinRoot)\x86\midl.exe&quot; &quot;$(ObjDir)\%(Idls.Filename)%(Idls.Extension)&quot; /header &quot;$(CompiledHeadersDir)\%(Idls.Filename).h&quot; $(MidlArgs)"/>
+  </Target>
+</Project>
