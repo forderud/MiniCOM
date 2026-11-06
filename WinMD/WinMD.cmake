@@ -40,3 +40,37 @@ function(generate_winmd TARGET WINMD)
         VERBATIM)
     add_custom_target(${TARGET} ALL DEPENDS "${WINMD}")
 endfunction()
+
+
+# generate_python_bindings(<target> <file.winmd> <namespace>...)
+#
+# Generates ctypes bindings for namespaces of a .winmd file into <build dir>/<target>: one
+# <name>Bindings.py module per namespace, named after its last part, so that MyApp.Example
+# becomes ExampleBindings, and the comruntime.py they all use. Reading the .winmd takes
+# dnfile.
+set(WINMD_TO_PYTHON "${CMAKE_CURRENT_LIST_DIR}/winmd2py.py")
+set(WINMD_COMRUNTIME "${CMAKE_CURRENT_LIST_DIR}/comruntime.py")
+
+function(generate_python_bindings TARGET WINMD)
+    find_package(Python COMPONENTS Interpreter REQUIRED)
+    get_filename_component(WINMD "${WINMD}" ABSOLUTE)
+    set(OUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/${TARGET}")
+
+    add_custom_command(
+        OUTPUT  "${OUT_DIR}/comruntime.py"
+        COMMAND ${CMAKE_COMMAND} -E copy "${WINMD_COMRUNTIME}" "${OUT_DIR}/comruntime.py"
+        DEPENDS "${WINMD_COMRUNTIME}")
+    set(OUTPUTS "${OUT_DIR}/comruntime.py")
+    foreach(NAMESPACE ${ARGN})
+        string(REGEX REPLACE "^.*\\." "" NAME "${NAMESPACE}")
+        set(PY_FILE "${OUT_DIR}/${NAME}Bindings.py")
+        add_custom_command(
+            OUTPUT  "${PY_FILE}"
+            COMMAND ${Python_EXECUTABLE} "${WINMD_TO_PYTHON}" "${WINMD}" "${NAMESPACE}" "${PY_FILE}"
+            DEPENDS "${WINMD_TO_PYTHON}" "${WINMD}"
+            COMMENT "Generating Python bindings for ${NAMESPACE}"
+            VERBATIM)
+        list(APPEND OUTPUTS "${PY_FILE}")
+    endforeach()
+    add_custom_target(${TARGET} ALL DEPENDS ${OUTPUTS})
+endfunction()
