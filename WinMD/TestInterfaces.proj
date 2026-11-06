@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generates TestInterfaces.winmd from the IDL files with https://github.com/microsoft/win32metadata.
+     Build with "dotnet build" (.NET 10 SDK) from a Visual Studio developer prompt. -->
+<Project>
+  <Import Project="Sdk.props" Sdk="Microsoft.Windows.WinmdGenerator" Version="0.71.45-preview"/>
+
+  <PropertyGroup>
+    <IdlDir>$(MSBuildProjectDirectory)\..\TestInterfaces</IdlDir>
+    <OutputWinmd>$(IdlDir)\TestInterfaces.winmd</OutputWinmd>
+    <WinmdVersion>1.0.0.0</WinmdVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Idls Include="$(IdlDir)\Example.idl"/>
+
+    <Partition Include="Example.cpp" TraverseFiles="$(CompiledHeadersDir)\Example.h" Namespace="Example"/>
+
+    <!-- https://github.com/microsoft/win32metadata/issues/2392 -->
+    <PackageDownload Include="NETStandard.Library.Ref" Version="[2.1.0]"/>
+    <EmitterRsp Include="$(ObjDir)\netstandard.rsp"/>
+  </ItemGroup>
+
+  <Import Project="Sdk.targets" Sdk="Microsoft.Windows.WinmdGenerator" Version="0.71.45-preview"/>
+
+  <Target Name="NetstandardRsp" BeforeTargets="EmitWinmd">
+    <WriteLinesToFile File="$(ObjDir)\netstandard.rsp" Overwrite="true"
+      Lines="--ref;$(NuGetPackageRoot)netstandard.library.ref\2.1.0\ref\netstandard2.1\netstandard.dll"/>
+  </Target>
+
+  <!-- the generator's CompileIdls without its Visual Studio lookup:
+       https://github.com/microsoft/win32metadata/issues/2391 -->
+  <Target Name="CompileIdls" BeforeTargets="Build"
+    Inputs="@(Idls)" Outputs="@(Idls->'$(CompiledHeadersDir)\%(Filename).h')">
+    <MakeDir Directories="$(CompiledHeadersDir)"/>
+    <Exec Command="powershell.exe -NoProfile -File &quot;$(ScriptsDir)\ConvertMidlAttributesToSalAnnotations.ps1&quot; -inputFileName &quot;%(Idls.FullPath)&quot; -outputFileName &quot;$(ObjDir)\%(Filename)%(Extension)&quot;"/>
+    <Exec Command="&quot;$(WindowsSDKVersionedBinRoot)\x86\midl.exe&quot; &quot;$(ObjDir)\%(Idls.Filename)%(Idls.Extension)&quot; /header &quot;$(CompiledHeadersDir)\%(Idls.Filename).h&quot; /out &quot;$(ObjDir)&quot; /notlb /nologo /I&quot;$(SdkIncRoot)\um&quot; /I&quot;$(SdkIncRoot)\shared&quot; /I&quot;$(ObjDir)&quot;"/>
+  </Target>
+</Project>
