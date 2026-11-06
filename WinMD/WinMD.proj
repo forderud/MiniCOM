@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generates a .winmd file from IDL files with https://github.com/microsoft/win32metadata,
+     one namespace per IDL file, named after it and placed under $(WinmdNamespace) when
+     given. Build with the .NET 10 SDK from a Visual Studio developer prompt, with %3B
+     between IDL files since -p: splits on ";":
+       dotnet build WinMD.proj -p:IdlFiles=a.idl%3Bb.idl -p:OutputWinmd=out.winmd
+         -p:ObjDir=<dir> [-p:WinmdNamespace=<namespace>] -->
+<Project>
+  <Import Project="Sdk.props" Sdk="Microsoft.Windows.WinmdGenerator" Version="0.71.45-preview"/>
+
+  <PropertyGroup>
+    <WinmdVersion>1.0.0.0</WinmdVersion>
+    <!-- reported when the x86, x64 and arm64 scans of an IDL file agree, as they usually do -->
+    <MSBuildWarningsAsMessages>CSSW001</MSBuildWarningsAsMessages>
+    <ScraperHeader>$(ObjDir)\scraper.header.txt</ScraperHeader>
+    <NamespacePrefix Condition="'$(WinmdNamespace)' != ''">$(WinmdNamespace).</NamespacePrefix>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Idls Include="$([MSBuild]::Unescape($(IdlFiles)))"/>
+
+    <!-- ClangSharp reads each MIDL-generated header through a .cpp file that includes it -->
+    <Partition Include="@(Idls->'$(ObjDir)\%(Filename).cpp')">
+      <TraverseFiles>$(CompiledHeadersDir)\%(Filename).h</TraverseFiles>
+      <Namespace>$(NamespacePrefix)%(Filename)</Namespace>
+    </Partition>
+
+    <!-- https://github.com/microsoft/win32metadata/issues/2392 -->
+    <PackageDownload Include="NETStandard.Library.Ref" Version="[2.1.0]"/>
+    <EmitterRsp Include="$(ObjDir)\netstandard.rsp"/>
+  </ItemGroup>
+
+  <Import Project="Sdk.targets" Sdk="Microsoft.Windows.WinmdGenerator" Version="0.71.45-preview"/>
+
+  <!-- the partition files, and a "using" of every namespace, so that an IDL file can refer
+       to the interfaces of one it imports -->
+  <Target Name="WritePartitions" BeforeTargets="PrepScraperHeader">
+    <WriteLinesToFile File="%(Partition.Identity)" Overwrite="true" Lines="#include &quot;%(Partition.Filename).h&quot;"/>
+    <WriteLinesToFile File="$(ScraperHeader)" Overwrite="true" Lines="@(Idls->'using $(NamespacePrefix)%(Filename)%3B')"/>
+  </Target>
+
+  <Target Name="NetstandardRsp" BeforeTargets="EmitWinmd">
+    <WriteLinesToFile File="$(ObjDir)\netstandard.rsp" Overwrite="true"
+      Lines="--ref;$(NuGetPackageRoot)netstandard.library.ref\2.1.0\ref\netstandard2.1\netstandard.dll"/>
+  </Target>
+
+  <!-- the generator's CompileIdls without its Visual Studio lookup:
+       https://github.com/microsoft/win32metadata/issues/2391 -->
+  <Target Name="CompileIdls" BeforeTargets="Build"
+    Inputs="@(Idls)" Outputs="@(Idls->'$(CompiledHeadersDir)\%(Filename).h')">
+    <MakeDir Directories="$(CompiledHeadersDir)"/>
+    <Exec Command="powershell.exe -NoProfile -File &quot;$(ScriptsDir)\ConvertMidlAttributesToSalAnnotations.ps1&quot; -inputFileName &quot;%(Idls.FullPath)&quot; -outputFileName &quot;$(ObjDir)\%(Filename)%(Extension)&quot;"/>
+    <Exec Command="&quot;$(WindowsSDKVersionedBinRoot)\x86\midl.exe&quot; &quot;$(ObjDir)\%(Idls.Filename)%(Idls.Extension)&quot; /header &quot;$(CompiledHeadersDir)\%(Idls.Filename).h&quot; /out &quot;$(ObjDir)&quot; /notlb /no_warn /nologo /I&quot;$(SdkIncRoot)\um&quot; /I&quot;$(SdkIncRoot)\shared&quot; /I&quot;$(ObjDir)&quot;"/>
+  </Target>
+</Project>

@@ -33,6 +33,10 @@ if(NOT WIN32)
     endfunction()
 endif()
 
+if(WIN32)
+    include(WinMD/WinMD.cmake)
+endif()
+
 add_subdirectory(TestInterfaces)
 add_subdirectory(CppTests)
 add_subdirectory(PyTests)
