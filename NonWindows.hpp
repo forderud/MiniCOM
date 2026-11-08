@@ -45,7 +45,7 @@ static GUID hold_uuidof () = delete; // fail build if performing __uuidof() on u
 
 typedef GUID           IID;
 typedef unsigned int   DWORD;   ///< 32bit unsigned
-typedef long           BOOL;
+typedef int32_t        BOOL;    ///< 32bit int (cannot use 'long' since it's 64bit on 64bit Linux)
 typedef unsigned char  BYTE;
 typedef unsigned short USHORT;  ///< 16bit unsigned
 typedef unsigned int   UINT;    ///< 32bit int
