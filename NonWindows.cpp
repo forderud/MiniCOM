@@ -157,78 +157,142 @@ Buffer<IUnknownFactory::Entry> & IUnknownFactory::Factories () {
 }
 
 
-template <> __attribute__((visibility("default")))
-ATL::CComSafeArray<BSTR>::CComSafeArray (UINT size) {
-    m_ptr = SAFEARRAY::Create(SAFEARRAY::TYPE_STRINGS);
-    m_ptr->strings.resize(size);
-}
-template <> __attribute__((visibility("default")))
-ATL::CComSafeArray<IUnknown*>::CComSafeArray (UINT size) {
-    m_ptr = SAFEARRAY::Create(SAFEARRAY::TYPE_POINTERS);
-    m_ptr->pointers.resize(size);
+/** Hidden bytes in front of the SAFEARRAY descriptor, holding the element VARTYPE, like on Windows. */
+static constexpr size_t SAFEARRAY_HIDDEN_SIZE = 16;
+
+__attribute__((visibility("default")))
+SAFEARRAY* InternalSafeArrayCreate (VARTYPE vt, ULONG elm_size, ULONG count) {
+    auto* ptr = static_cast<unsigned char*>(calloc(1, SAFEARRAY_HIDDEN_SIZE + sizeof(SAFEARRAY)));
+    if (!ptr)
+        return nullptr;
+
+    auto* psa = reinterpret_cast<SAFEARRAY*>(ptr + SAFEARRAY_HIDDEN_SIZE);
+    psa->cDims = 1;
+    psa->cbElements = elm_size;
+    psa->rgsabound[0].cElements = count;
+    if (vt != VT_EMPTY) {
+        psa->fFeatures = FADF_HAVEVARTYPE | ((vt == VT_BSTR) ? FADF_BSTR : (vt == VT_UNKNOWN) ? FADF_UNKNOWN : 0);
+        reinterpret_cast<uint32_t*>(psa)[-1] = vt; // stored in the 4 bytes before the descriptor
+    }
+
+    psa->pvData = calloc(count ? count : 1, elm_size); // zero-initialized
+    if (!psa->pvData) {
+        free(ptr);
+        return nullptr;
+    }
+    return psa;
 }
 
-template <> __attribute__((visibility("default")))
-ATL::CComTypeWrapper<BSTR>::type& CComSafeArray<BSTR>::GetAt (int idx) const {
-    assert(m_ptr);
-    assert(m_ptr->type == SAFEARRAY::TYPE_STRINGS);
-    return m_ptr->strings[idx];
-}
-template <> __attribute__((visibility("default")))
-ATL::CComTypeWrapper<IUnknown*>::type& CComSafeArray<IUnknown*>::GetAt (int idx) const {
-    assert(m_ptr);
-    assert(m_ptr->type == SAFEARRAY::TYPE_POINTERS);
-    return m_ptr->pointers[idx];
+__attribute__((visibility("default")))
+SAFEARRAY* SafeArrayCreate (VARTYPE vt, UINT cDims, SAFEARRAYBOUND* rgsabound) {
+    if ((cDims != 1) || !rgsabound)
+        return nullptr; // only one-dimensional arrays are supported
+
+    ULONG elm_size = 0;
+    switch (vt) {
+    case VT_I1: case VT_UI1:                       elm_size = 1; break;
+    case VT_I2: case VT_UI2:                       elm_size = 2; break;
+    case VT_I4: case VT_UI4: case VT_R4:           elm_size = 4; break;
+    case VT_I8: case VT_UI8: case VT_R8:           elm_size = 8; break;
+    case VT_BSTR: case VT_UNKNOWN:                 elm_size = sizeof(void*); break;
+    default:                                       return nullptr; // unsupported element type
+    }
+
+    SAFEARRAY* psa = InternalSafeArrayCreate(vt, elm_size, rgsabound->cElements);
+    if (psa)
+        psa->rgsabound[0].lLbound = rgsabound->lLbound;
+    return psa;
 }
 
-template <> __attribute__((visibility("default")))
-HRESULT ATL::CComSafeArray<IUnknown*>::SetAt(int idx, IUnknown* const& val, [[maybe_unused]] bool copy) {
-    assert(val);
-    assert(static_cast<size_t>(idx) < m_ptr->pointers.size());
+__attribute__((visibility("default")))
+SAFEARRAY* SafeArrayCreateVector (VARTYPE vt, LONG lLbound, ULONG cElements) {
+    SAFEARRAYBOUND bound = {cElements, lLbound};
+    return SafeArrayCreate(vt, 1, &bound);
+}
 
-    if (static_cast<size_t>(idx) >= m_ptr->pointers.size())
+__attribute__((visibility("default")))
+HRESULT SafeArrayDestroy (SAFEARRAY* psa) {
+    if (!psa)
+        return S_OK;
+    if (psa->cLocks)
+        return DISP_E_ARRAYISLOCKED;
+
+    const ULONG count = psa->rgsabound[0].cElements;
+    if (psa->fFeatures & FADF_BSTR) {
+        for (ULONG i = 0; i < count; i++)
+            SysFreeString(static_cast<BSTR*>(psa->pvData)[i]);
+    } else if (psa->fFeatures & FADF_UNKNOWN) {
+        for (ULONG i = 0; i < count; i++) {
+            IUnknown* obj = static_cast<IUnknown**>(psa->pvData)[i];
+            if (obj)
+                obj->Release();
+        }
+    }
+    free(psa->pvData);
+    free(reinterpret_cast<unsigned char*>(psa) - SAFEARRAY_HIDDEN_SIZE);
+    return S_OK;
+}
+
+__attribute__((visibility("default")))
+HRESULT SafeArrayGetVartype (SAFEARRAY* psa, /*out*/VARTYPE* pvt) {
+    if (!psa || !pvt)
+        return E_INVALIDARG;
+    if (!(psa->fFeatures & FADF_HAVEVARTYPE))
         return E_INVALIDARG;
 
-    assert(m_ptr);
-    assert(m_ptr->type == SAFEARRAY::TYPE_POINTERS);
-    m_ptr->pointers[idx] = val;
+    *pvt = static_cast<VARTYPE>(reinterpret_cast<uint32_t*>(psa)[-1]); // stored in the 4 bytes before the descriptor
     return S_OK;
 }
 
-template <> __attribute__((visibility("default")))
-HRESULT ATL::CComSafeArray<BSTR>::Add (const typename CComTypeWrapper<BSTR>::type& t, BOOL copy) {
-    (void)copy; // mute unreferenced argument warning
-
-    if (!m_ptr)
-        m_ptr = SAFEARRAY::Create(SAFEARRAY::TYPE_STRINGS); // lazy initialization
-
-    assert(m_ptr->type == SAFEARRAY::TYPE_STRINGS);
-    const size_t prev_size = m_ptr->strings.size();
-    m_ptr->strings.resize(prev_size + 1, t);
-    return S_OK;
+__attribute__((visibility("default")))
+UINT SafeArrayGetDim (SAFEARRAY* psa) {
+    return psa ? psa->cDims : 0;
 }
-template <> __attribute__((visibility("default")))
-HRESULT ATL::CComSafeArray<IUnknown*>::Add (const typename CComTypeWrapper<IUnknown*>::type& t, BOOL copy) {
-    (void)copy; // mute unreferenced argument warning
 
-    if (!m_ptr)
-        m_ptr = SAFEARRAY::Create(SAFEARRAY::TYPE_POINTERS); // lazy initialization
+__attribute__((visibility("default")))
+UINT SafeArrayGetElemsize (SAFEARRAY* psa) {
+    return psa ? psa->cbElements : 0;
+}
 
-    assert(m_ptr->type == SAFEARRAY::TYPE_POINTERS);
-    const size_t prev_size = m_ptr->pointers.size();
-    m_ptr->pointers.resize(prev_size + 1, t);
+__attribute__((visibility("default")))
+HRESULT SafeArrayGetLBound (SAFEARRAY* psa, UINT nDim, /*out*/LONG* plLbound) {
+    if (!psa || !plLbound)
+        return E_INVALIDARG;
+    if (nDim != 1)
+        return DISP_E_BADINDEX;
+
+    *plLbound = psa->rgsabound[0].lLbound;
     return S_OK;
 }
 
-template <> __attribute__((visibility("default")))
-unsigned int ATL::CComSafeArray<BSTR>::GetCount () const {
-    assert(m_ptr);
-    assert(m_ptr->type == SAFEARRAY::TYPE_STRINGS);
-    return static_cast<unsigned int>(m_ptr->strings.size());
+__attribute__((visibility("default")))
+HRESULT SafeArrayGetUBound (SAFEARRAY* psa, UINT nDim, /*out*/LONG* plUbound) {
+    if (!psa || !plUbound)
+        return E_INVALIDARG;
+    if (nDim != 1)
+        return DISP_E_BADINDEX;
+
+    *plUbound = psa->rgsabound[0].lLbound + static_cast<LONG>(psa->rgsabound[0].cElements) - 1;
+    return S_OK;
 }
-template <> __attribute__((visibility("default")))
-unsigned int ATL::CComSafeArray<IUnknown*>::GetCount () const {
-    assert(m_ptr);
-    assert(m_ptr->type == SAFEARRAY::TYPE_POINTERS);
-    return static_cast<unsigned int>(m_ptr->pointers.size());
+
+__attribute__((visibility("default")))
+HRESULT SafeArrayAccessData (SAFEARRAY* psa, /*out*/void** ppvData) {
+    if (!psa || !ppvData)
+        return E_INVALIDARG;
+
+    psa->cLocks++;
+    *ppvData = psa->pvData;
+    return S_OK;
+}
+
+__attribute__((visibility("default")))
+HRESULT SafeArrayUnaccessData (SAFEARRAY* psa) {
+    if (!psa)
+        return E_INVALIDARG;
+    if (psa->cLocks == 0)
+        return E_UNEXPECTED;
+
+    psa->cLocks--;
+    return S_OK;
 }

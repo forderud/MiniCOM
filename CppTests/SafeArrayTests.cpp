@@ -171,6 +171,74 @@ TEST(SafeArrayTests, TestSafeArray2d) {
 }
 #endif
 
+TEST(SafeArrayTests, SafeArrayCreateVectorRoundTrip) {
+    // create an array through the C API and read it through CComSafeArray
+    SAFEARRAY* sa = SafeArrayCreateVector(VT_I4, 0, 3);
+    ASSERT_NE(sa, nullptr);
+    ASSERT_EQ(SafeArrayGetDim(sa), 1u);
+    ASSERT_EQ(SafeArrayGetElemsize(sa), sizeof(int));
+    {
+        VARTYPE type = 0;
+        CHECK(SafeArrayGetVartype(sa, &type));
+        ASSERT_EQ(type, VT_I4);
+
+        int* data = nullptr;
+        CHECK(SafeArrayAccessData(sa, reinterpret_cast<void**>(&data)));
+        for (int i = 0; i < 3; ++i)
+            data[i] = 10*i;
+        CHECK(SafeArrayUnaccessData(sa));
+    }
+    CComSafeArray<int> arr;
+    CHECK(arr.Attach(sa)); // take over ownership
+    ASSERT_EQ(arr.GetCount(), 3u);
+    for (int i = 0; i < 3; ++i)
+        ASSERT_EQ(arr[i], 10*i);
+
+    // create a string array through CComSafeArray and read it through the C API
+    CComSafeArray<BSTR> strings(2u);
+    CHECK(strings.SetAt(0, CComBSTR(L"first")));
+    CHECK(strings.Add(CComBSTR(L"third")));
+    sa = strings.Detach(); // take over ownership
+    {
+        VARTYPE type = 0;
+        CHECK(SafeArrayGetVartype(sa, &type));
+        ASSERT_EQ(type, VT_BSTR);
+        LONG lower = -1, upper = -1;
+        CHECK(SafeArrayGetLBound(sa, 1, &lower));
+        CHECK(SafeArrayGetUBound(sa, 1, &upper));
+        ASSERT_EQ(lower, 0);
+        ASSERT_EQ(upper, 2);
+
+        BSTR* data = nullptr; // elements are plain BSTR pointers (nullptr for the empty string)
+        CHECK(SafeArrayAccessData(sa, reinterpret_cast<void**>(&data)));
+        ASSERT_STREQ(data[0], L"first");
+        ASSERT_EQ(data[1], nullptr);
+        ASSERT_EQ(SysStringLen(data[2]), 5u);
+        CHECK(SafeArrayUnaccessData(sa));
+    }
+    CHECK(SafeArrayDestroy(sa)); // frees the strings
+}
+
+#ifndef _WIN32
+TEST(SafeArrayTests, StructElementSafeArray) {
+    struct Point {
+        int x = 1;
+        int y = 2;
+    };
+    CComSafeArray<Point> arr(2u); // element type without VARTYPE (not supported by ATL on Windows)
+    ASSERT_EQ(arr.m_ptr->cbElements, sizeof(Point));
+    ASSERT_EQ(arr[1].y, 2); // default constructed
+    arr[0].x = 3;
+    arr.Add(Point{4, 5});
+    ASSERT_EQ(arr.GetCount(), 3u);
+    ASSERT_EQ(arr[0].x, 3);
+    ASSERT_EQ(arr[2].y, 5);
+
+    CComSafeArray<Point> copy(arr.m_ptr); // deep copy
+    ASSERT_EQ(copy[2].x, 4);
+}
+#endif
+
 TEST(SafeArrayTests, LargeSafeArrayTest) {
     {
         // try allocating a 1GB safearray (verify that it doesn't fail)

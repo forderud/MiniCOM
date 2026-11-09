@@ -52,6 +52,7 @@ typedef unsigned int   UINT;    ///< 32bit int
 typedef unsigned int   ULONG;   ///< 32bit unsigned (cannot use 'long' since it's 64bit on 64bit Linux)
 typedef int            LONG;    ///< 32bit int (cannot use 'long' since it can be 64bit)
 typedef short  VARIANT_BOOL;    ///< boolean type that's natively marshaled to C# and Python
+typedef unsigned short VARTYPE; ///< VARENUM value identifying a type
 typedef wchar_t*       BSTR;    ///< zero terminated text string prefixed by a 32bit byte length (see SysAllocString)
 typedef int32_t        HRESULT; ///< 32bit signed int (negative values indicate failure)
 typedef void*          HWND;    ///< window handle
@@ -77,6 +78,25 @@ static_assert(sizeof(int) == 4, "int size not 32bit");
 #define E_NOT_SET      static_cast<int32_t>(0x80070490L)
 #define REGDB_E_CLASSNOTREG static_cast<int32_t>(0x80040154L)
 #define CO_E_CLASSSTRING    static_cast<int32_t>(0x800401F3L)
+#define DISP_E_BADINDEX      static_cast<int32_t>(0x8002000BL)
+#define DISP_E_ARRAYISLOCKED static_cast<int32_t>(0x8002000DL)
+
+/** Subset of the VARENUM type codes from wtypes.h. Used to tag SAFEARRAY element types. */
+enum VARENUM {
+  VT_EMPTY   = 0,
+  VT_I2      = 2,
+  VT_I4      = 3,
+  VT_R4      = 4,
+  VT_R8      = 5,
+  VT_BSTR    = 8,
+  VT_UNKNOWN = 13,
+  VT_I1      = 16,
+  VT_UI1     = 17,
+  VT_UI2     = 18,
+  VT_UI4     = 19,
+  VT_I8      = 20,
+  VT_UI8     = 21
+};
 
 
 enum CLSCTX { 
@@ -122,6 +142,8 @@ inline const char* InternalHresultToString(HRESULT hr) {
     case E_OUTOFMEMORY: return "E_OUTOFMEMORY";
     case E_INVALIDARG:  return "E_INVALIDARG";
     case E_NOT_SET:     return "E_NOT_SET";
+    case DISP_E_BADINDEX:      return "DISP_E_BADINDEX";
+    case DISP_E_ARRAYISLOCKED: return "DISP_E_ARRAYISLOCKED";
     default:            return "HRESULT error";
     }
 }
@@ -1108,95 +1130,107 @@ protected:
 template <class T>
 using CComQIPtr = CComPtr<T>;
 
-template <class T>
-struct CComSafeArray;
-
 } // namespace ATL
 
-/** Internal class that SHALL ONLY be accessed through CComSafeArray<T> to preserve Windows compatibility. */
-struct SAFEARRAY {
-    template<typename T>
-    friend struct ATL::CComSafeArray;
 
-private:
-    enum TYPE {
-        TYPE_EMPTY,
-        TYPE_DATA,
-        TYPE_STRINGS,
-        TYPE_POINTERS,
-    };
-
-    SAFEARRAY (TYPE t) : type(t), elm_size(sizeof(void*)) {
-        assert(t == TYPE_STRINGS || t == TYPE_POINTERS);
-    }
-    SAFEARRAY (unsigned int _elm_size, unsigned int count) : type(TYPE_DATA), data(_elm_size*count), elm_size(_elm_size) {
-    }
-    SAFEARRAY(const SAFEARRAY& other, bool deep_copy) : type(other.type), data(other.data, deep_copy), strings(other.strings, deep_copy), pointers(other.pointers, deep_copy), elm_size(other.elm_size) {
-    }
-
-    ~SAFEARRAY() {
-    }
-
-    SAFEARRAY () = delete;
-    SAFEARRAY& operator = (const SAFEARRAY&) = delete;
-    
-    static SAFEARRAY* Create(TYPE t) {
-        auto* ptr = (SAFEARRAY*)malloc(sizeof(SAFEARRAY));
-        new (ptr) SAFEARRAY(t);
-        return ptr;
-    }
-    static SAFEARRAY* Create(unsigned int _elm_size, unsigned int count) {
-        auto* ptr = (SAFEARRAY*)malloc(sizeof(SAFEARRAY));
-        new (ptr) SAFEARRAY(_elm_size, count);
-        return ptr;
-    }
-    static SAFEARRAY* Create(const SAFEARRAY& other, bool deep_copy = true) {
-        auto* ptr = (SAFEARRAY*)malloc(sizeof(SAFEARRAY));
-        new (ptr) SAFEARRAY(other, deep_copy);
-        return ptr;
-    }
-    
-    static void Destroy(SAFEARRAY* obj) {
-        obj->~SAFEARRAY();
-        free(obj);
-    }
-
-    const TYPE                     type = TYPE_EMPTY; ///< \todo: Replace with std::variant when upgrading to C++17
-    Buffer<unsigned char>          data;
-    Buffer<ATL::CComBSTR>          strings;
-    Buffer<ATL::CComPtr<IUnknown>> pointers;
-    const unsigned int             elm_size = 0;
+/** Taken from oaidl.h. */
+struct SAFEARRAYBOUND {
+    ULONG cElements; ///< number of elements
+    LONG  lLbound;   ///< index of the first element
 };
+
+/** Taken from oaidl.h. Same memory layout as on Windows: the elements are stored contiguously in pvData, with
+    BSTR and IUnknown* elements as plain pointers. The descriptor is preceded by 16 hidden bytes, with the element
+    VARTYPE stored in the 4 bytes before the descriptor (FADF_HAVEVARTYPE), like on Windows.
+    Only one-dimensional arrays are supported. */
+struct SAFEARRAY {
+    USHORT cDims;      ///< number of dimensions (always 1)
+    USHORT fFeatures;  ///< FADF_* flags
+    ULONG  cbElements; ///< element size in bytes
+    ULONG  cLocks;     ///< lock count (incremented by SafeArrayAccessData)
+    void*  pvData;     ///< element data
+    SAFEARRAYBOUND rgsabound[1]; ///< one bound per dimension
+};
+static_assert(sizeof(SAFEARRAY) == 16 + 2*sizeof(void*), "SAFEARRAY not packed");
+
+// SAFEARRAY fFeatures flags (from oaidl.h)
+#define FADF_HAVEVARTYPE 0x0080 ///< element VARTYPE is stored before the descriptor
+#define FADF_BSTR        0x0100 ///< array of BSTRs (freed with SysFreeString when destroyed)
+#define FADF_UNKNOWN     0x0200 ///< array of IUnknown* (released when destroyed)
+
+/* One-dimensional subset of the SAFEARRAY API, with the same signatures as on Windows. */
+extern "C" { // to avoid name mangling
+/** Create a zero-initialized array of the given element type. Only cDims=1 is supported. Returns nullptr on failure. */
+SAFEARRAY* SafeArrayCreate (VARTYPE vt, UINT cDims, SAFEARRAYBOUND* rgsabound);
+SAFEARRAY* SafeArrayCreateVector (VARTYPE vt, LONG lLbound, ULONG cElements);
+/** Free the elements (BSTRs & IUnknown* included), the data and the descriptor. Fails if locked. */
+HRESULT SafeArrayDestroy (SAFEARRAY* psa);
+/** Get the element type. Fails for arrays without FADF_HAVEVARTYPE. */
+HRESULT SafeArrayGetVartype (SAFEARRAY* psa, /*out*/VARTYPE* pvt);
+UINT    SafeArrayGetDim (SAFEARRAY* psa);
+UINT    SafeArrayGetElemsize (SAFEARRAY* psa);
+HRESULT SafeArrayGetLBound (SAFEARRAY* psa, UINT nDim, /*out*/LONG* plLbound);
+HRESULT SafeArrayGetUBound (SAFEARRAY* psa, UINT nDim, /*out*/LONG* plUbound);
+/** Lock the array and return a pointer to its data. Call SafeArrayUnaccessData when done. */
+HRESULT SafeArrayAccessData (SAFEARRAY* psa, /*out*/void** ppvData);
+HRESULT SafeArrayUnaccessData (SAFEARRAY* psa);
+} // extern "C"
+
+/** Internal function used by CComSafeArray, to also support element types without a VARTYPE (vt=VT_EMPTY). */
+SAFEARRAY* InternalSafeArrayCreate (VARTYPE vt, ULONG elm_size, ULONG count);
 
 
 namespace ATL {
 
+/** Maps SAFEARRAY element types to their VARTYPE and the class that wraps the elements in-place. */
 template <typename T>
 struct CComTypeWrapper {
     typedef T type; // default mapping
+    static constexpr VARTYPE vt = VT_EMPTY; // no VARTYPE for other types (e.g. structs), so SafeArrayGetVartype fails
 };
-template <>
-struct CComTypeWrapper<BSTR> {
-    typedef CComBSTR type; // map BSTR/wchar_t* to CComBSTR
-};
-template <>
-struct CComTypeWrapper<IUnknown*> {
-    typedef CComPtr<IUnknown> type; // wrap IUnknown* in CComPtr
-};
+#define DEFINE_COM_TYPE_WRAPPER(T, WRAPPER, VT) \
+    template <> \
+    struct CComTypeWrapper<T> { \
+        typedef WRAPPER type; \
+        static constexpr VARTYPE vt = VT; \
+    };
+DEFINE_COM_TYPE_WRAPPER(char,               char,               VT_I1)
+DEFINE_COM_TYPE_WRAPPER(unsigned char,      unsigned char,      VT_UI1)
+DEFINE_COM_TYPE_WRAPPER(short,              short,              VT_I2)
+DEFINE_COM_TYPE_WRAPPER(unsigned short,     unsigned short,     VT_UI2)
+DEFINE_COM_TYPE_WRAPPER(int,                int,                VT_I4)
+DEFINE_COM_TYPE_WRAPPER(unsigned int,       unsigned int,       VT_UI4)
+DEFINE_COM_TYPE_WRAPPER(long long,          long long,          VT_I8)
+DEFINE_COM_TYPE_WRAPPER(unsigned long long, unsigned long long, VT_UI8)
+DEFINE_COM_TYPE_WRAPPER(float,              float,              VT_R4)
+DEFINE_COM_TYPE_WRAPPER(double,             double,             VT_R8)
+DEFINE_COM_TYPE_WRAPPER(BSTR,               CComBSTR,           VT_BSTR)    // map BSTR/wchar_t* to CComBSTR
+DEFINE_COM_TYPE_WRAPPER(IUnknown*,          CComPtr<IUnknown>,  VT_UNKNOWN) // wrap IUnknown* in CComPtr
+#undef DEFINE_COM_TYPE_WRAPPER
+static_assert(sizeof(CComPtr<IUnknown>) == sizeof(IUnknown*), "CComPtr size mismatch");
 
 template <class T>
 struct CComSafeArray {
+    typedef typename CComTypeWrapper<T>::type ELM; ///< in-place element type
+
     CComSafeArray () {
     }
 
     CComSafeArray (UINT size) {
-        m_ptr = SAFEARRAY::Create(sizeof(T), size);
+        m_ptr = InternalSafeArrayCreate(CComTypeWrapper<T>::vt, sizeof(T), size);
+        assert(m_ptr);
+        InternalConstruct(0, size);
     }
 
     CComSafeArray (SAFEARRAY * obj) {
         if (obj) {
-            assert(obj->elm_size == sizeof(T));
-            m_ptr = SAFEARRAY::Create(*obj);
+            assert(obj->cbElements == sizeof(T));
+            unsigned int count = InternalElementCount(obj);
+            m_ptr = InternalSafeArrayCreate(CComTypeWrapper<T>::vt, sizeof(T), count);
+            assert(m_ptr);
+            InternalConstruct(0, count);
+            for (unsigned int i = 0; i < count; i++)
+                GetAt(i) = InternalDataPointer(obj)[i]; // deep copy
         }
     }
 
@@ -1217,19 +1251,28 @@ struct CComSafeArray {
 
     HRESULT Destroy() {
         if (m_ptr) {
-            SAFEARRAY::Destroy(m_ptr);
+            if constexpr (CComTypeWrapper<T>::vt == VT_EMPTY) {
+                for (unsigned int i = 0; i < GetCount(); i++)
+                    GetAt(i).~ELM(); // SafeArrayDestroy only knows how to destroy BSTR & IUnknown* elements
+            }
+            HRESULT hr = SafeArrayDestroy(m_ptr);
+            assert(SUCCEEDED(hr) && "CComSafeArray::Destroy failed (array locked?)");
+            if (FAILED(hr))
+                return hr;
             m_ptr = nullptr;
         }
         return S_OK;
     }
 
+    /** Take over ownership of an existing array. */
     HRESULT Attach (SAFEARRAY * obj) {
         assert(obj);
-        assert(obj->elm_size == sizeof(T));
+        assert(obj->cbElements == sizeof(T));
         Destroy();
         m_ptr = obj;
         return S_OK;
     }
+    /** Release ownership of the array. Must be destroyed with SafeArrayDestroy unless re-attached. */
     SAFEARRAY* Detach () {
         SAFEARRAY* tmp = m_ptr;
         m_ptr = nullptr;
@@ -1240,82 +1283,76 @@ struct CComSafeArray {
         return m_ptr;
     }
 
-    typename CComTypeWrapper<T>::type& GetAt (int idx) const {
+    /** Returns a reference to the element. BSTR & IUnknown* elements are returned as CComBSTR & CComPtr<IUnknown> references into the array. */
+    ELM& GetAt (int idx) const {
         assert(m_ptr);
-        assert(m_ptr->type == SAFEARRAY::TYPE_DATA);
-        unsigned char * ptr = &m_ptr->data[idx*m_ptr->elm_size];
-        return reinterpret_cast<T&>(*ptr);
+        assert((idx >= 0) && (static_cast<unsigned int>(idx) < GetCount()));
+        return InternalDataPointer(m_ptr)[idx];
     }
 
-    typename CComTypeWrapper<T>::type& operator [] (int idx) {
+    ELM& operator [] (int idx) {
         return GetAt(idx);
     }
 
+    /** Set an element. BSTR & IUnknown* elements are copied/AddRef'ed. */
     HRESULT SetAt (int idx, const T& val, bool copy = true) {
         (void)copy; // mute unreferenced argument warning
-        assert(m_ptr);
-        assert(m_ptr->type == SAFEARRAY::TYPE_DATA);
-        assert(sizeof(T) == m_ptr->elm_size);
-        unsigned char * ptr = &m_ptr->data[idx*m_ptr->elm_size];
-        reinterpret_cast<T&>(*ptr) = val;
+        if constexpr (std::is_same_v<T, IUnknown*>)
+            assert(val);
+
+        GetAt(idx) = val;
         return S_OK;
     }
 
-    HRESULT Add (const typename CComTypeWrapper<T>::type& t, BOOL copy = true) {
+    /** Append an element. BSTR & IUnknown* elements are copied/AddRef'ed. */
+    HRESULT Add (const ELM& t, BOOL copy = true) {
         (void)copy; // mute unreferenced argument warning
-        
-        if (!m_ptr)
-            m_ptr = SAFEARRAY::Create(sizeof(T), 0); // lazy initialization
 
-        assert(m_ptr->type == SAFEARRAY::TYPE_DATA);
-        assert(sizeof(T) == m_ptr->elm_size);
-        const size_t prev_size = m_ptr->data.size();
-        m_ptr->data.resize(prev_size + sizeof(T), 0);
-        reinterpret_cast<T&>(m_ptr->data[prev_size]) = t;
+        if (!m_ptr)
+            m_ptr = InternalSafeArrayCreate(CComTypeWrapper<T>::vt, sizeof(T), 0); // lazy initialization
+
+        assert(sizeof(T) == m_ptr->cbElements);
+        const unsigned int prev_count = GetCount();
+        void* data = realloc(m_ptr->pvData, (prev_count + 1)*sizeof(T));
+        if (!data)
+            return E_OUTOFMEMORY;
+
+        m_ptr->pvData = data;
+        m_ptr->rgsabound[0].cElements = prev_count + 1;
+        InternalConstruct(prev_count, prev_count + 1);
+        GetAt(prev_count) = t;
         return S_OK;
     }
 
     unsigned int GetCount () const {
         assert(m_ptr);
-        assert(m_ptr->type == SAFEARRAY::TYPE_DATA);
-        return static_cast<unsigned int>(m_ptr->data.size()/m_ptr->elm_size);
+        return m_ptr->rgsabound[0].cElements;
     }
-    
+
     /** Internal function. Do NOT call unless you know what you're doing. */
-    static typename CComTypeWrapper<T>::type* InternalDataPointer(SAFEARRAY* obj) {
-        CComSafeArray<T> sa;
-        sa.Attach(obj);
-        typename CComTypeWrapper<T>::type* ptr = &sa.GetAt(0);
-        sa.Detach();
-        return ptr;
+    static ELM* InternalDataPointer(SAFEARRAY* obj) {
+        return static_cast<ELM*>(obj->pvData);
     }
 
     /** Internal function. Do NOT call unless you know what you're doing. */
     static unsigned int InternalElementCount(SAFEARRAY* obj) {
-        CComSafeArray<T> sa;
-        sa.Attach(obj);
-        unsigned int count = sa.GetCount();
-        sa.Detach();
-        return count;
-    }
-    
-    /** Internal function. Do NOT call unless you know what you're doing. */
-    static SAFEARRAY* InternalShallowCopy(const SAFEARRAY& obj) {
-        return SAFEARRAY::Create(obj, /*deep copy*/false);
+        return obj->rgsabound[0].cElements;
     }
 
     SAFEARRAY* m_ptr = nullptr;
+
+private:
+    /** Default-construct the elements in the [first, last) range (the memory is already zero-initialized). */
+    void InternalConstruct (unsigned int first, unsigned int last) {
+        if constexpr (!std::is_trivially_default_constructible_v<ELM>) {
+            for (unsigned int i = first; i < last; i++)
+                new (&InternalDataPointer(m_ptr)[i]) ELM();
+        } else {
+            (void)first; (void)last; // mute unreferenced argument warnings
+        }
+    }
 };
-// Template specializations. Implemented in cpp file.
-template <> CComSafeArray<BSTR>::CComSafeArray (UINT size);
-template <> CComSafeArray<IUnknown*>::CComSafeArray (UINT size);
-template <> CComTypeWrapper<BSTR>::type& CComSafeArray<BSTR>::GetAt (int idx) const;
-template <> CComTypeWrapper<IUnknown*>::type& CComSafeArray<IUnknown*>::GetAt (int idx) const;
-template <> HRESULT CComSafeArray<IUnknown*>::SetAt (int idx, IUnknown* const& val, bool copy);
-template <> HRESULT                      CComSafeArray<BSTR>::Add (const typename CComTypeWrapper<BSTR>::type& t, BOOL copy);
-template <> HRESULT                 CComSafeArray<IUnknown*>::Add (const typename CComTypeWrapper<IUnknown*>::type& t, BOOL copy);
-template <> unsigned int CComSafeArray<BSTR>::GetCount () const;
-template <> unsigned int CComSafeArray<IUnknown*>::GetCount () const;
+static_assert(sizeof(CComSafeArray<BYTE>) == sizeof(SAFEARRAY*), "CComSafeArray size mismatch");
 
 
 // COM calling convention (use default on non-Windows)
