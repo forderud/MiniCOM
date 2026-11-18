@@ -1,9 +1,4 @@
-/* Interfaces that build on Example.idl, for the Python binding test. They pass
-   what Example.idl does not, and a real interface library does: interfaces
-   declared in an imported file, IUnknown, strings, fixed-size arrays, booleans,
-   enums, structs holding all of those, several [out] arguments and [in,out]
-   ones. ISource derives from an interface in the imported file. An "int **"
-   stands for a type the bindings cannot pass. */
+/* Interfaces that build on Example.idl, with the parameter types of a real interface library. */
 import "Example.idl";
 
 
