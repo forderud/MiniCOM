@@ -16,8 +16,12 @@ if(WIN32)
     target_include_directories(TestInterfaces PUBLIC ${CMAKE_CURRENT_BINARY_DIR}) # folder with generated headers
 
     # committed like Example.tlh, for other platforms to read
-    generate_winmd(TestInterfacesWinMD TestInterfaces.winmd Example.idl)
+    generate_winmd(TestInterfacesWinMD TestInterfaces.winmd Example.idl Registry.idl)
 else()
+    # also Registry.idl, which Windows only puts in the .winmd
+    list(APPEND IDL_INPUTS  "${CMAKE_CURRENT_SOURCE_DIR}/Registry.idl")
+    list(APPEND IDL_OUTPUTS "${CMAKE_CURRENT_BINARY_DIR}/Registry.h")
+
     process_idl_files("${IDL_INPUTS}" "${IDL_OUTPUTS}")
     target_sources(TestInterfaces PRIVATE "${IDL_OUTPUTS}")
     target_include_directories(TestInterfaces PUBLIC "${CMAKE_CURRENT_BINARY_DIR}") # folder with generated headers
