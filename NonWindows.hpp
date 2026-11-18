@@ -203,14 +203,14 @@ public:
     _bstr_t() noexcept = default;
 
     _bstr_t(const _bstr_t& s) noexcept {
-        Assign(s.m_str);
+        AssignCopy(s.m_str);
     }
     _bstr_t(const wchar_t* s) {
         Assign(s);
     }
     _bstr_t(BSTR s, bool copy) {
         if (copy)
-            Assign(s);
+            AssignCopy(s);
         else
             m_str = s; // attach to BSTR
     }
@@ -220,7 +220,7 @@ public:
     }
 
     _bstr_t& operator=(const _bstr_t& s) noexcept {
-        Assign(s.m_str);
+        AssignCopy(s.m_str);
         return *this;
     }
     _bstr_t& operator=(const wchar_t* s) {
@@ -288,6 +288,17 @@ public:
     }
 
 private:
+    /** Copy a BSTR including its length, so that embedded zeros are kept. */
+    void AssignCopy(BSTR s) {
+        if (s == m_str)
+            return; // self-assignment
+
+        Clear();
+
+        if (s)
+            m_str = SysAllocStringLen(s, SysStringLen(s));
+    }
+
     void Clear() {
         if (!m_str)
             return;

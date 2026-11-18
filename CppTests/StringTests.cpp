@@ -165,3 +165,26 @@ TEST(StringTests, Verify_CComBSTR_AttachDetach) {
     ASSERT_STREQ(copy, L"string");
     SysFreeString(copy);
 }
+
+TEST(StringTests, Verify_bstr_t_copy_keeps_embedded_zeros) {
+    const wchar_t src[] = {L'a', L'\0', L'b'};
+    _bstr_t str1(SysAllocStringLen(src, 3), false); // take over ownership
+
+    _bstr_t str2(str1); // copy ctor
+    ASSERT_EQ(str2.length(), 3u);
+
+    _bstr_t str3;
+    str3 = str1; // copy assignment
+    ASSERT_EQ(str3.length(), 3u);
+
+    _bstr_t str4(static_cast<BSTR>(str1), true); // copy from BSTR
+    ASSERT_EQ(str4.length(), 3u);
+    ASSERT_EQ(static_cast<wchar_t*>(str4)[2], L'b');
+}
+
+#ifndef _WIN32
+TEST(StringTests, Verify_SysAllocStringLen_overflow) {
+    // byte length doesn't fit in the 32bit length prefix
+    ASSERT_EQ(SysAllocStringLen(nullptr, 0x40000000u), nullptr);
+}
+#endif

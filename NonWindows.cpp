@@ -3,6 +3,9 @@
 
 __attribute__((visibility("default")))
 BSTR SysAllocStringLen (const wchar_t* str, unsigned int len) {
+    if (len > (UINT32_MAX - sizeof(wchar_t))/sizeof(wchar_t))
+        return nullptr; // byte length doesn't fit in the 32bit prefix
+
     const size_t byte_len = static_cast<size_t>(len)*sizeof(wchar_t);
 
     // byte length prefix, followed by the characters and a zero terminator
