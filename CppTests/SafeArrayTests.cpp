@@ -390,15 +390,15 @@ TEST(CComSafeArrayTest, CreateBoolArray) {
     CHECK(SafeArrayDestroy(sa));
 }
 
-TEST(CComSafeArrayTest, SetBSTRKeepsLengthAndOwnership) {
+TEST(CComSafeArrayTest, SetBSTRCopyAndOwnership) {
     CComSafeArray<BSTR> arr(2u);
 
-    // copy keeps embedded zeros
+    // copied with SysAllocString like ATL, so only up to the first embedded zero
     const wchar_t src[] = {L'a', L'\0', L'b'};
     BSTR str = SysAllocStringLen(src, 3);
     CHECK(arr.SetAt(0, str));
     ASSERT_NE(static_cast<BSTR>(arr[0]), str);
-    ASSERT_EQ(SysStringLen(arr[0]), 3u);
+    ASSERT_EQ(SysStringLen(arr[0]), 1u);
     SysFreeString(str);
 
     // copy=false takes over ownership

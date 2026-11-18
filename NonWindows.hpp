@@ -1387,11 +1387,11 @@ struct CComSafeArray {
     SAFEARRAY* m_ptr = nullptr;
 
 private:
-    /** Assign an element like ATL: BSTRs are copied with their length (keeping embedded zeros) and IUnknown*
+    /** Assign an element like ATL: BSTRs are copied with SysAllocString (so not past an embedded zero) and IUnknown*
         are AddRef'ed, unless copy is false, in which case the array takes over ownership. */
     static void InternalAssign (ELM& dst, const T& val, bool copy) {
         if constexpr (std::is_same_v<T, BSTR>) {
-            dst.Attach(copy ? SysAllocStringLen(val, SysStringLen(val)) : val);
+            dst.Attach(copy ? SysAllocString(val) : val);
         } else if constexpr (std::is_same_v<T, IUnknown*>) {
             if (copy)
                 dst = val; // AddRef
