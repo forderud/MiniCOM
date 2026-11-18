@@ -188,15 +188,9 @@ SAFEARRAY* SafeArrayCreate (VARTYPE vt, UINT cDims, SAFEARRAYBOUND* rgsabound) {
     if ((cDims != 1) || !rgsabound)
         return nullptr; // only one-dimensional arrays are supported
 
-    ULONG elm_size = 0;
-    switch (vt) {
-    case VT_I1: case VT_UI1:                       elm_size = 1; break;
-    case VT_I2: case VT_UI2:                       elm_size = 2; break;
-    case VT_I4: case VT_UI4: case VT_R4:           elm_size = 4; break;
-    case VT_I8: case VT_UI8: case VT_R8:           elm_size = 8; break;
-    case VT_BSTR: case VT_UNKNOWN:                 elm_size = sizeof(void*); break;
-    default:                                       return nullptr; // unsupported element type
-    }
+    const ULONG elm_size = InternalVartypeSize(vt);
+    if (!elm_size)
+        return nullptr; // unsupported element type
 
     SAFEARRAY* psa = InternalSafeArrayCreate(vt, elm_size, rgsabound->cElements);
     if (psa)

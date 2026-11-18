@@ -88,15 +88,34 @@ enum VARENUM {
   VT_I4      = 3,
   VT_R4      = 4,
   VT_R8      = 5,
+  VT_CY      = 6,
+  VT_DATE    = 7,
   VT_BSTR    = 8,
+  VT_ERROR   = 10,
+  VT_BOOL    = 11,
   VT_UNKNOWN = 13,
   VT_I1      = 16,
   VT_UI1     = 17,
   VT_UI2     = 18,
   VT_UI4     = 19,
   VT_I8      = 20,
-  VT_UI8     = 21
+  VT_UI8     = 21,
+  VT_INT     = 22,
+  VT_UINT    = 23
 };
+
+/** Element size in bytes of the VARTYPEs that SAFEARRAY supports, or 0 if unsupported. */
+constexpr ULONG InternalVartypeSize (VARTYPE vt) {
+    switch (vt) {
+    case VT_I1: case VT_UI1:                                         return 1;
+    case VT_I2: case VT_UI2: case VT_BOOL:                           return 2;
+    case VT_I4: case VT_UI4: case VT_INT: case VT_UINT:
+    case VT_R4: case VT_ERROR:                                       return 4;
+    case VT_I8: case VT_UI8: case VT_R8: case VT_CY: case VT_DATE:   return 8;
+    case VT_BSTR: case VT_UNKNOWN:                                   return sizeof(void*);
+    default:                                                         return 0;
+    }
+}
 
 
 enum CLSCTX { 
@@ -1193,6 +1212,7 @@ struct CComTypeWrapper {
     struct CComTypeWrapper<T> { \
         typedef WRAPPER type; \
         static constexpr VARTYPE vt = VT; \
+        static_assert(sizeof(T) == InternalVartypeSize(VT), "VARTYPE size mismatch"); \
     };
 DEFINE_COM_TYPE_WRAPPER(char,               char,               VT_I1)
 DEFINE_COM_TYPE_WRAPPER(unsigned char,      unsigned char,      VT_UI1)
@@ -1216,26 +1236,31 @@ struct CComSafeArray {
     CComSafeArray () {
     }
 
-    CComSafeArray (UINT size) {
+    CComSafeArray (UINT size, LONG lower_bound = 0) {
         m_ptr = InternalSafeArrayCreate(CComTypeWrapper<T>::vt, sizeof(T), size);
         assert(m_ptr);
+        m_ptr->rgsabound[0].lLbound = lower_bound;
         InternalConstruct(0, size);
     }
 
+    /** Deep copy of an existing array, including its lower bound. */
     CComSafeArray (SAFEARRAY * obj) {
         if (obj) {
             assert(obj->cbElements == sizeof(T));
             unsigned int count = InternalElementCount(obj);
             m_ptr = InternalSafeArrayCreate(CComTypeWrapper<T>::vt, sizeof(T), count);
             assert(m_ptr);
+            m_ptr->rgsabound[0].lLbound = obj->rgsabound[0].lLbound;
             InternalConstruct(0, count);
             for (unsigned int i = 0; i < count; i++)
-                GetAt(i) = InternalDataPointer(obj)[i]; // deep copy
+                InternalDataPointer(m_ptr)[i] = InternalDataPointer(obj)[i]; // deep copy
         }
     }
 
     ~CComSafeArray () {
-        Destroy();
+        HRESULT hr = Destroy();
+        assert(SUCCEEDED(hr) && "CComSafeArray destroyed while locked.");
+        (void)hr; // mute unreferenced variable warning
     }
 
     CComSafeArray (const CComSafeArray&) = delete;
@@ -1251,12 +1276,14 @@ struct CComSafeArray {
 
     HRESULT Destroy() {
         if (m_ptr) {
+            if (m_ptr->cLocks)
+                return DISP_E_ARRAYISLOCKED; // checked before destroying any elements
+
             if constexpr (CComTypeWrapper<T>::vt == VT_EMPTY) {
                 for (unsigned int i = 0; i < GetCount(); i++)
-                    GetAt(i).~ELM(); // SafeArrayDestroy only knows how to destroy BSTR & IUnknown* elements
+                    InternalDataPointer(m_ptr)[i].~ELM(); // SafeArrayDestroy only knows how to destroy BSTR & IUnknown* elements
             }
             HRESULT hr = SafeArrayDestroy(m_ptr);
-            assert(SUCCEEDED(hr) && "CComSafeArray::Destroy failed (array locked?)");
             if (FAILED(hr))
                 return hr;
             m_ptr = nullptr;
@@ -1283,50 +1310,68 @@ struct CComSafeArray {
         return m_ptr;
     }
 
-    /** Returns a reference to the element. BSTR & IUnknown* elements are returned as CComBSTR & CComPtr<IUnknown> references into the array. */
+    /** Returns a reference to the element at index "idx", counted from the lower bound like ATL.
+        BSTR & IUnknown* elements are returned as CComBSTR & CComPtr<IUnknown> references into the array. */
     ELM& GetAt (int idx) const {
         assert(m_ptr);
-        assert((idx >= 0) && (static_cast<unsigned int>(idx) < GetCount()));
-        return InternalDataPointer(m_ptr)[idx];
+        assert((idx >= GetLowerBound()) && (idx <= GetUpperBound()));
+        return InternalDataPointer(m_ptr)[idx - GetLowerBound()];
     }
 
     ELM& operator [] (int idx) {
         return GetAt(idx);
     }
 
-    /** Set an element. BSTR & IUnknown* elements are copied/AddRef'ed. */
+    /** Set an element. BSTR & IUnknown* elements are copied/AddRef'ed, or taken over if copy is false. */
     HRESULT SetAt (int idx, const T& val, bool copy = true) {
-        (void)copy; // mute unreferenced argument warning
         if constexpr (std::is_same_v<T, IUnknown*>)
             assert(val);
 
-        GetAt(idx) = val;
+        InternalAssign(GetAt(idx), val, copy);
         return S_OK;
     }
 
-    /** Append an element. BSTR & IUnknown* elements are copied/AddRef'ed. */
-    HRESULT Add (const ELM& t, BOOL copy = true) {
-        (void)copy; // mute unreferenced argument warning
-
-        if (!m_ptr)
+    /** Append an element. BSTR & IUnknown* elements are copied/AddRef'ed, or taken over if copy is false. */
+    HRESULT Add (const T& t, BOOL copy = true) {
+        if (!m_ptr) {
             m_ptr = InternalSafeArrayCreate(CComTypeWrapper<T>::vt, sizeof(T), 0); // lazy initialization
+            if (!m_ptr)
+                return E_OUTOFMEMORY;
+        }
+        if (m_ptr->cLocks)
+            return DISP_E_ARRAYISLOCKED; // would invalidate pointers from SafeArrayAccessData
 
         assert(sizeof(T) == m_ptr->cbElements);
         const unsigned int prev_count = GetCount();
-        void* data = realloc(m_ptr->pvData, (prev_count + 1)*sizeof(T));
+        // allocate a new block instead of realloc, so that "t" stays valid if it refers to an element of this array
+        void* data = calloc(prev_count + 1, sizeof(T));
         if (!data)
             return E_OUTOFMEMORY;
+        if (prev_count)
+            memcpy(data, m_ptr->pvData, prev_count*sizeof(T)); // relocate the existing elements
 
+        void* prev_data = m_ptr->pvData;
         m_ptr->pvData = data;
         m_ptr->rgsabound[0].cElements = prev_count + 1;
         InternalConstruct(prev_count, prev_count + 1);
-        GetAt(prev_count) = t;
+        InternalAssign(InternalDataPointer(m_ptr)[prev_count], t, copy);
+        free(prev_data);
         return S_OK;
     }
 
     unsigned int GetCount () const {
         assert(m_ptr);
         return m_ptr->rgsabound[0].cElements;
+    }
+
+    LONG GetLowerBound () const {
+        assert(m_ptr);
+        return m_ptr->rgsabound[0].lLbound;
+    }
+
+    LONG GetUpperBound () const {
+        assert(m_ptr);
+        return m_ptr->rgsabound[0].lLbound + static_cast<LONG>(m_ptr->rgsabound[0].cElements) - 1;
     }
 
     /** Internal function. Do NOT call unless you know what you're doing. */
@@ -1342,6 +1387,22 @@ struct CComSafeArray {
     SAFEARRAY* m_ptr = nullptr;
 
 private:
+    /** Assign an element like ATL: BSTRs are copied with their length (keeping embedded zeros) and IUnknown*
+        are AddRef'ed, unless copy is false, in which case the array takes over ownership. */
+    static void InternalAssign (ELM& dst, const T& val, bool copy) {
+        if constexpr (std::is_same_v<T, BSTR>) {
+            dst.Attach(copy ? SysAllocStringLen(val, SysStringLen(val)) : val);
+        } else if constexpr (std::is_same_v<T, IUnknown*>) {
+            if (copy)
+                dst = val; // AddRef
+            else
+                dst.Attach(val);
+        } else {
+            (void)copy; // mute unreferenced argument warning
+            dst = val;
+        }
+    }
+
     /** Default-construct the elements in the [first, last) range (the memory is already zero-initialized). */
     void InternalConstruct (unsigned int first, unsigned int last) {
         if constexpr (!std::is_trivially_default_constructible_v<ELM>) {

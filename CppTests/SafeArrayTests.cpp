@@ -352,3 +352,97 @@ TEST(CComSafeArrayTest, TestConvertToSafeArray) {
         EXPECT_EQ(sa_vals.GetCount(), 3u);
     }
 }
+
+TEST(CComSafeArrayTest, LowerBoundIndexing) {
+    // indices are counted from the lower bound, like ATL
+    SAFEARRAY* sa = SafeArrayCreateVector(VT_I4, 1, 3);
+    ASSERT_NE(sa, nullptr);
+    {
+        int* data = nullptr;
+        CHECK(SafeArrayAccessData(sa, reinterpret_cast<void**>(&data)));
+        for (int i = 0; i < 3; ++i)
+            data[i] = 10*i;
+        CHECK(SafeArrayUnaccessData(sa));
+    }
+
+    CComSafeArray<int> copy(sa); // deep copy keeps the lower bound
+    ASSERT_EQ(copy.GetLowerBound(), 1);
+    ASSERT_EQ(copy.GetUpperBound(), 3);
+    ASSERT_EQ(copy[1], 0);
+    ASSERT_EQ(copy[3], 20);
+
+    CComSafeArray<int> arr;
+    CHECK(arr.Attach(sa)); // take over ownership
+    ASSERT_EQ(arr.GetLowerBound(), 1);
+    ASSERT_EQ(arr[1], 0);
+    ASSERT_EQ(arr[3], 20);
+    CHECK(arr.SetAt(2, 5));
+    ASSERT_EQ(arr[2], 5);
+}
+
+TEST(CComSafeArrayTest, CreateBoolArray) {
+    SAFEARRAY* sa = SafeArrayCreateVector(VT_BOOL, 0, 2);
+    ASSERT_NE(sa, nullptr);
+    ASSERT_EQ(SafeArrayGetElemsize(sa), sizeof(VARIANT_BOOL));
+    VARTYPE type = 0;
+    CHECK(SafeArrayGetVartype(sa, &type));
+    ASSERT_EQ(type, VT_BOOL);
+    CHECK(SafeArrayDestroy(sa));
+}
+
+TEST(CComSafeArrayTest, SetBSTRKeepsLengthAndOwnership) {
+    CComSafeArray<BSTR> arr(2u);
+
+    // copy keeps embedded zeros
+    const wchar_t src[] = {L'a', L'\0', L'b'};
+    BSTR str = SysAllocStringLen(src, 3);
+    CHECK(arr.SetAt(0, str));
+    ASSERT_NE(static_cast<BSTR>(arr[0]), str);
+    ASSERT_EQ(SysStringLen(arr[0]), 3u);
+    SysFreeString(str);
+
+    // copy=false takes over ownership
+    BSTR owned = SysAllocString(L"owned");
+    CHECK(arr.SetAt(1, owned, false));
+    ASSERT_EQ(static_cast<BSTR>(arr[1]), owned); // freed by the array
+}
+
+#ifndef _WIN32
+struct CountedElement {
+    static int destroyed;
+    int value = 7;
+    ~CountedElement() {
+        destroyed++;
+    }
+};
+int CountedElement::destroyed = 0;
+
+TEST(CComSafeArrayTest, AddElementOfSameArray) {
+    CComSafeArray<CountedElement> arr(1u);
+    CHECK(arr.Add(arr[0])); // reference into the array that Add reallocates
+    ASSERT_EQ(arr.GetCount(), 2u);
+    ASSERT_EQ(arr[1].value, 7);
+
+    CComSafeArray<BSTR> strings(1u);
+    CHECK(strings.SetAt(0, CComBSTR(L"text")));
+    CHECK(strings.Add(strings[0]));
+    ASSERT_STREQ(strings[1], L"text");
+}
+
+TEST(CComSafeArrayTest, LockedArrayIsNeitherResizedNorDestroyed) {
+    CountedElement::destroyed = 0;
+    CComSafeArray<CountedElement> arr(2u);
+
+    void* data = nullptr;
+    CHECK(SafeArrayAccessData(arr, &data));
+    ASSERT_EQ(arr.Add(CountedElement()), DISP_E_ARRAYISLOCKED);
+    CountedElement::destroyed = 0; // ignore the temporary
+    ASSERT_EQ(arr.Destroy(), DISP_E_ARRAYISLOCKED);
+    ASSERT_EQ(CountedElement::destroyed, 0); // elements untouched
+    ASSERT_EQ(arr.GetCount(), 2u);
+
+    CHECK(SafeArrayUnaccessData(arr));
+    CHECK(arr.Destroy());
+    ASSERT_EQ(CountedElement::destroyed, 2);
+}
+#endif
