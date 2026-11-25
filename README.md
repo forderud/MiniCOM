@@ -22,7 +22,7 @@ There's no point in supporting Windows, since the same functionality is already 
 
 ### Missing features
 * Complete COM or ATL support.
-* Wrapper-code-free access from C# and Python on non-Windows. This is best handled by a _separate_ project that generates language bindings based on `.tlb` or [`.winmd`](https://github.com/microsoft/winmd) metadata.
+* Wrapper-code-free access from C# and Python on non-Windows. This is best handled by a _separate_ project that generates language bindings based on `.tlb` or [`.winmd`](https://github.com/microsoft/win32metadata) metadata.
 * Out-of-process marshalling on non-Windows.
 
 Contributions for addressing missing features are welcome.
