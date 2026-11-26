@@ -1,6 +1,74 @@
 #include "NonWindows.hpp"
 
 
+__attribute__((visibility("default")))
+BSTR SysAllocStringLen (const wchar_t* str, unsigned int len) {
+    if (len > (UINT32_MAX - sizeof(wchar_t))/sizeof(wchar_t))
+        return nullptr; // byte length doesn't fit in the 32bit prefix
+
+    const size_t byte_len = static_cast<size_t>(len)*sizeof(wchar_t);
+
+    // byte length prefix, followed by the characters and a zero terminator
+    auto* ptr = static_cast<unsigned char*>(malloc(sizeof(uint32_t) + byte_len + sizeof(wchar_t)));
+    if (!ptr)
+        return nullptr;
+
+    *reinterpret_cast<uint32_t*>(ptr) = static_cast<uint32_t>(byte_len);
+    BSTR result = reinterpret_cast<BSTR>(ptr + sizeof(uint32_t));
+    if (str)
+        memcpy(result, str, byte_len); // might contain embedded zeros
+    else
+        memset(result, 0, byte_len);
+    result[len] = L'\0';
+    return result;
+}
+
+__attribute__((visibility("default")))
+BSTR SysAllocString (const wchar_t* str) {
+    if (!str)
+        return nullptr;
+
+    return SysAllocStringLen(str, static_cast<unsigned int>(wcslen(str)));
+}
+
+__attribute__((visibility("default")))
+void SysFreeString (BSTR str) {
+    if (!str)
+        return;
+
+    free(reinterpret_cast<unsigned char*>(str) - sizeof(uint32_t));
+}
+
+__attribute__((visibility("default")))
+unsigned int SysStringByteLen (BSTR str) {
+    if (!str)
+        return 0;
+
+    return *reinterpret_cast<uint32_t*>(reinterpret_cast<unsigned char*>(str) - sizeof(uint32_t));
+}
+
+__attribute__((visibility("default")))
+unsigned int SysStringLen (BSTR str) {
+    return SysStringByteLen(str)/sizeof(wchar_t);
+}
+
+
+__attribute__((visibility("default")))
+void* CoTaskMemAlloc (size_t size) {
+    return malloc(size);
+}
+
+__attribute__((visibility("default")))
+void* CoTaskMemRealloc (void* ptr, size_t size) {
+    return realloc(ptr, size);
+}
+
+__attribute__((visibility("default")))
+void CoTaskMemFree (void* ptr) {
+    free(ptr);
+}
+
+
 /** Resolve COM class CLSID based on "[<Program>.]<Component>[.<Version>]" ProgID string. */
 __attribute__((visibility("default")))
 HRESULT CLSIDFromProgID (const wchar_t* ProgID, /*out*/GUID* clsid) {

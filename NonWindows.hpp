@@ -12,7 +12,7 @@
 #include <cassert>
 #include <atomic>
 #include <string>
-#include <string.h> // for wcsdup
+#include <string.h> // for memcmp
 #include <codecvt>
 #include <locale>
 #include <iostream>
@@ -52,7 +52,7 @@ typedef unsigned int   UINT;    ///< 32bit int
 typedef unsigned int   ULONG;   ///< 32bit unsigned (cannot use 'long' since it's 64bit on 64bit Linux)
 typedef int            LONG;    ///< 32bit int (cannot use 'long' since it can be 64bit)
 typedef short  VARIANT_BOOL;    ///< boolean type that's natively marshaled to C# and Python
-typedef wchar_t*       BSTR;    ///< zero terminated double-byte text string
+typedef wchar_t*       BSTR;    ///< zero terminated text string prefixed by a 32bit byte length (see SysAllocString)
 typedef int32_t        HRESULT; ///< 32bit signed int (negative values indicate failure)
 typedef void*          HWND;    ///< window handle
 typedef unsigned long long  ULONGLONG; ///< 64bit unsigned
@@ -173,22 +173,46 @@ private:
 };
 
 
+/* BSTR memory layout, same as on Windows:
+     [byte length (32bit)] [characters...] [zero terminator]
+   The BSTR pointer points to the first character, with the byte length stored in the 4 bytes before it.
+   The length excludes the zero terminator and is sizeof(wchar_t) per character, which is 4 on Linux & MacOS
+   (UTF-32) as opposed to 2 on Windows (UTF-16). A BSTR must be freed with SysFreeString, not free(). */
+extern "C" { // to avoid name mangling
+/** Allocate a BSTR copy of a zero terminated string. Returns nullptr if str is nullptr. */
+BSTR SysAllocString (const wchar_t* str);
+/** Allocate a BSTR of "len" characters, initialized from "str" if non-null. Can contain embedded zeros. */
+BSTR SysAllocStringLen (const wchar_t* str, unsigned int len);
+/** Free a BSTR allocated with SysAllocString or SysAllocStringLen. Accepts nullptr. */
+void SysFreeString (BSTR str);
+/** Returns the BSTR length in characters, excluding the zero terminator (0 for nullptr). */
+unsigned int SysStringLen (BSTR str);
+/** Returns the BSTR length in bytes, excluding the zero terminator (0 for nullptr). */
+unsigned int SysStringByteLen (BSTR str);
+
+/** COM task memory allocator, used for [out] arguments that the callee allocates and the caller frees. */
+void* CoTaskMemAlloc (size_t size);
+void* CoTaskMemRealloc (void* ptr, size_t size);
+void  CoTaskMemFree (void* ptr);
+} // extern "C"
+
+
 /** API-compatible subset of the Microsoft _bstr_t class documented on https://docs.microsoft.com/en-us/cpp/cpp/bstr-t-class */
 class _bstr_t {
 public:
     _bstr_t() noexcept = default;
-    
+
     _bstr_t(const _bstr_t& s) noexcept {
-        Assign(s.m_str);
+        AssignCopy(s.m_str);
     }
     _bstr_t(const wchar_t* s) {
         Assign(s);
     }
-    _bstr_t(wchar_t* s, bool copy) {
+    _bstr_t(BSTR s, bool copy) {
         if (copy)
-            Assign(s);
+            AssignCopy(s);
         else
-            m_str = s; // attach to string
+            m_str = s; // attach to BSTR
     }
 
     ~_bstr_t() noexcept {
@@ -196,7 +220,7 @@ public:
     }
 
     _bstr_t& operator=(const _bstr_t& s) noexcept {
-        Assign(s.m_str);
+        AssignCopy(s.m_str);
         return *this;
     }
     _bstr_t& operator=(const wchar_t* s) {
@@ -232,10 +256,7 @@ public:
 
     /** Returns string length excluding null termination. */
     unsigned int length() const noexcept {
-        if (!m_str)
-            return 0;
-
-        return static_cast<unsigned int>(wcslen(m_str));
+        return SysStringLen(m_str);
     }
 
     void Assign(const wchar_t* s) {
@@ -243,9 +264,9 @@ public:
             return; // self-assignment
 
         Clear();
-        
+
         if (s)
-            m_str = wcsdup(s);
+            m_str = SysAllocString(s);
     }
 
     BSTR* GetAddress() {
@@ -253,26 +274,40 @@ public:
         return &m_str;
     }
 
-    void Attach(wchar_t* s) {
-        Assign(s);
+    /** Take over ownership of a BSTR (does not copy). */
+    void Attach(BSTR s) {
+        Clear();
+        m_str = s;
     }
 
-    wchar_t* Detach() {
-        wchar_t* tmp = m_str;
+    /** Release ownership of the BSTR. Must be freed with SysFreeString unless re-attached. */
+    BSTR Detach() {
+        BSTR tmp = m_str;
         m_str = nullptr;
         return tmp;
     }
 
 private:
+    /** Copy a BSTR including its length, so that embedded zeros are kept. */
+    void AssignCopy(BSTR s) {
+        if (s == m_str)
+            return; // self-assignment
+
+        Clear();
+
+        if (s)
+            m_str = SysAllocStringLen(s, SysStringLen(s));
+    }
+
     void Clear() {
         if (!m_str)
             return;
 
-        free(m_str);
+        SysFreeString(m_str);
         m_str = nullptr;
     }
-    
-    wchar_t* m_str = nullptr;
+
+    BSTR m_str = nullptr;
 };
 static_assert(sizeof(_bstr_t) == sizeof(wchar_t*), "_bstr_t size mismatch");
 
@@ -285,10 +320,13 @@ public:
     }
     CComBSTR (const wchar_t* str) {
         if (str)
-            m_str = wcsdup(str);
+            m_str = SysAllocString(str);
     }
-    CComBSTR (int /*size*/, const wchar_t* str) {
-        m_str = wcsdup(str);
+    /** Copy "size" characters from str (nullptr if size is zero), like ATL. */
+    CComBSTR (int size, const wchar_t* str) {
+        assert(size >= 0);
+        if (size > 0)
+            m_str = SysAllocStringLen(str, static_cast<unsigned int>(size));
     }
     CComBSTR (const CComBSTR & other) {
         m_str = other.Copy();
@@ -308,46 +346,51 @@ public:
 
     /** Returns string length excluding null termination. */
     unsigned int Length () const {
-        if (!m_str)
-            return 0;
-
-        return static_cast<unsigned int>(wcslen(m_str));
+        return SysStringLen(m_str);
     }
 
-    operator wchar_t* () const {
+    /** Returns string length in bytes excluding null termination. */
+    unsigned int ByteLength () const {
+        return SysStringByteLen(m_str);
+    }
+
+    operator BSTR () const {
         return m_str;
     }
 
-    wchar_t** operator & () {
+    BSTR* operator & () {
         return &m_str;
     }
-    
-    void Attach(wchar_t* s) noexcept {
+
+    /** Take over ownership of a BSTR (does not copy). */
+    void Attach(BSTR s) noexcept {
         if (s == m_str)
             return;
 
         Empty();
         m_str = s;
     }
-    
-    wchar_t* Detach () {
-        wchar_t* tmp = m_str;
+
+    /** Release ownership of the BSTR. Must be freed with SysFreeString unless re-attached. */
+    BSTR Detach () {
+        BSTR tmp = m_str;
         m_str = nullptr;
         return tmp;
     }
 
-    wchar_t* Copy () const {
+    /** Returns a BSTR copy that the caller must free with SysFreeString. */
+    BSTR Copy () const {
         if (!m_str)
             return nullptr;
 
-        return wcsdup(m_str);
+        return SysAllocStringLen(m_str, SysStringLen(m_str));
     }
-    
+
     void Empty() {
         if (!m_str)
             return;
 
-        free(m_str);
+        SysFreeString(m_str);
         m_str = nullptr;
     }
     
@@ -367,9 +410,9 @@ public:
         return !operator == (other);
     }
 
-    wchar_t* m_str = nullptr;
+    BSTR m_str = nullptr;
 };
-static_assert(sizeof(CComBSTR) == sizeof(wchar_t*), "CComBSTR size mismatch");
+static_assert(sizeof(CComBSTR) == sizeof(BSTR), "CComBSTR size mismatch");
 
 template<typename T>
 class CComPtr;
